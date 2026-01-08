@@ -18,7 +18,7 @@ class RolePermissionSeeder extends Seeder
         // ==================================
         // Deklarasi Permissions
         // ==================================
-        $permissions = [
+        $permissions = [ 
 
             // DOcument Permissions
             'document.view_any',

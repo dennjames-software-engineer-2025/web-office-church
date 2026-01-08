@@ -6,9 +6,15 @@ use App\Http\Controllers\BidangController;
 use App\Http\Controllers\PeopleController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\PengesahanController;
+use App\Http\Controllers\ProgramController;
+use App\Http\Controllers\ProposalController;
 use App\Http\Controllers\TemplateController;
+use App\Http\Controllers\ToolsController;
 use App\Http\Controllers\UserApprovalController;
 use App\Http\Controllers\UserManagementController;
+use App\Models\Proposal;
+use Illuminate\Http\Request;
 
 Route::get('/', function () {
     return view('welcome');
@@ -18,33 +24,35 @@ Route::get('/dashboard', function () {
     return view('dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
-Route::middleware('auth', 'verified')->group(function () {
+Route::middleware(['auth', 'verified'])->group(function () {
 
-    // ===============================================================================================================================
+    // =======================================================================================================================================
     // Profile
-    // ===============================================================================================================================
+    // =======================================================================================================================================
 
     // Edit User
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::get('/profile', [ProfileController::class, 'edit'])
+    ->name('profile.edit');
 
     // Update User
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::patch('/profile', [ProfileController::class, 'update'])
+    ->name('profile.update');
 
     // Hapus User
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])
+    ->name('profile.destroy');
 
-    // ===============================================================================================================================
+    // =======================================================================================================================================
     // End Profile
-    // ===============================================================================================================================
+    // =======================================================================================================================================
 
-
-
-    // ===============================================================================================================================
+    // =======================================================================================================================================
     // Documents
-    // ===============================================================================================================================
+    // =======================================================================================================================================
 
     // Halaman utama Dokumen
-    Route::get('/documents', [DocumentController::class, 'index'])->name('documents.index');
+    Route::get('/documents', [DocumentController::class, 'index'])
+    ->name('documents.index');
 
     // Membuat Dokumen
     Route::get('/documents/create', [DocumentController::class, 'create'])->name('documents.create');
@@ -161,6 +169,128 @@ Route::middleware('auth', 'verified')->group(function () {
     Route::patch('/sies/{sie}/toggle', [SieController::class, 'toggle'])->name('sies.toggle');
     Route::delete('sies/{sie}', [SieController::class, 'destroy'])->middleware(['role:super_admin|tim_inti'])->name('sies.destroy');
     // End
+
+    // ==============================================================================================================================
+    // Tools Signature Pad
+    // ==============================================================================================================================
+    
+    Route::get('/signature', [ToolsController::class, 'signature'])->middleware('role:super_admin')->name('tools.signature');
+    Route::post('/signature/save', [ToolsController::class, 'saveSignature'])->middleware('role:super_admin')->name('tools.signature.save');
+
+    // ==============================================================================================================================
+    // Tools Signature Pad
+    // ==============================================================================================================================
+
+    // ======================================================================
+    // PENGESAHAN — ADMIN (Super Admin & Ketua)
+    // ======================================================================
+
+    Route::prefix('pengesahan/admin')
+        ->middleware(['role:super_admin|ketua'])
+        ->group(function () {
+
+        Route::get('/', [PengesahanController::class, 'index'])
+            ->name('pengesahan.admin.index');
+
+        Route::get('/{doc}/preview', [PengesahanController::class, 'preview'])
+            ->name('pengesahan.admin.preview');
+
+        Route::post('/{doc}/accept', [PengesahanController::class, 'accept'])
+            ->name('pengesahan.admin.accept');
+
+        Route::get('/{doc}/reject', [PengesahanController::class, 'rejectForm'])
+            ->name('pengesahan.admin.rejectForm');
+
+        Route::post('/{doc}/reject', [PengesahanController::class, 'reject'])
+            ->name('pengesahan.admin.reject');
+
+        Route::get('/{doc}/surat', [PengesahanController::class, 'suratForm'])
+            ->name('pengesahan.admin.suratForm');
+
+        Route::post('/{doc}/surat', [PengesahanController::class, 'suratStore'])
+            ->name('pengesahan.admin.suratStore');
+
+        Route::get('/{doc}/watermark', [PengesahanController::class, 'watermarkForm'])
+            ->name('pengesahan.admin.watermarkForm');
+
+        Route::post('/{doc}/watermark', [PengesahanController::class, 'watermarkStore'])
+            ->name('pengesahan.admin.watermarkStore');
+
+        Route::delete('/{doc}', [PengesahanController::class, 'destroy'])
+            ->name('pengesahan.admin.destroy');
+    }); 
+    
+    // ======================================================================
+    // PENGESAHAN — ADMIN (Super Admin & Ketua)
+    // ======================================================================
+
+
+    // ======================================================================
+    // PENGESAHAN — USER (Tim Bidang & Tim Inti Non-Ketua)
+    // ======================================================================
+
+    Route::prefix('pengesahan/user')
+        ->middleware(['role:tim_bidang|wakil_ketua|sekretaris_1|sekretaris_2|bendahara_1|bendahara_2'])
+        ->group(function () {
+
+        Route::get('/upload', [PengesahanController::class, 'userCreate'])
+            ->name('pengesahan.userCreate');
+
+        Route::post('/upload', [PengesahanController::class, 'userStore'])
+            ->name('pengesahan.userStore');
+
+        Route::get('/history', [PengesahanController::class, 'userHistory'])
+            ->name('pengesahan.userHistory');
+
+        Route::delete('/{doc}/delete', [PengesahanController::class, 'userDestroy'])
+            ->name('pengesahan.userDestroy');
+    });
+
+    // ======================================================================
+    // PENGESAHAN — USER (Tim Bidang & Tim Inti Non-Ketua)
+    // ======================================================================
+
+
+    // ======================================================================
+    // PROGRAM 
+    // ======================================================================
+
+    Route::get('/programs', [ProgramController::class, 'index'])
+        ->middleware(['role:tim_bidang|tim_inti|super_admin'])
+        ->name('programs.index');
+        
+    Route::get('/programs/create', [ProgramController::class, 'create'])
+        ->middleware(['role:tim_bidang'])
+        ->name('programs.create');
+
+    Route::post('/programs', [ProgramController::class, 'store'])
+        ->middleware(['role:tim_bidang'])
+        ->name('programs.store');
+
+    Route::get('/programs/{program}', [ProgramController::class, 'show'])
+        ->middleware(['role:tim_bidang|tim_inti|super_admin'])
+        ->name('programs.show');
+    
+    Route::delete('/programs/{program}', [ProgramController::class, 'hapus'])
+        ->middleware(['role:tim_bidang'])
+        ->name('programs.destroy');
+
+    Route::patch('/programs/{program}/status', [ProgramController::class, 'changeStatus'])
+        ->middleware(['role:tim_inti|super_admin'])
+        ->name('programs.change-status');
+
+    Route::get('/programs/{program}/edit', [ProgramController::class, 'edit'])
+        ->middleware(['role:tim_bidang'])
+        ->name('programs.edit');
+
+    Route::put('/programs/{program}', [ProgramController::class, 'update'])
+        ->middleware(['role:tim_bidang'])
+        ->name('programs.update');
+        
+    // ======================================================================
+    // PROGRAM 
+    // ======================================================================
+
 });
 
 require __DIR__.'/auth.php';
