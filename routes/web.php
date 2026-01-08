@@ -84,7 +84,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/users/create-tim-inti', [UserManagementController::class, 'createTimInti'])
         ->middleware(['verified', 'role:super_admin'])
         ->name('users.create_inti');
-    
+
     // Store Tim Inti
     Route::post('/users/create-inti', [UserManagementController::class, 'storeTimInti'])
         ->middleware(['verified', 'role:super_admin'])
@@ -94,7 +94,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/users', [UserManagementController::class, 'index'])
         ->middleware(['verified', 'role:super_admin'])
         ->name('users.index');
-    // End 
+    // End
 
     // Menampilkan halaman Edit Manajemen User
     Route::get('/users/{user}/edit', [UserManagementController::class, 'edit'])
@@ -102,7 +102,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('users.edit');
     // End
 
-    // Simpan perubahan 
+    // Simpan perubahan
     Route::put('/users/{user}', [UserManagementController::class, 'update'])
         ->whereNumber('user')
         ->middleware('verified', 'role:super_admin')
@@ -130,7 +130,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Mengunduh Template (Semua Role bisa melihat Template)
     Route::get('/templates', [TemplateController::class, 'index'])->name('templates.index');
     Route::get('/templates/{template}/download', [TemplateController::class, 'download'])->name('templates.download');
-    // End 
+    // End
 
     // Upload Template
     Route::post('/templates', [TemplateController::class, 'store'])->middleware(['role:super_admin|tim_inti|tim_bidang'])->name('templates.store');
@@ -138,7 +138,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Create Templates
     Route::get('/templates/create', [TemplateController::class, 'create'])->name('templates.create');
-    // End 
+    // End
 
     // Read Template
     Route::get('/templates/{template}', [TemplateController::class, 'show'])->name('templates.show');
@@ -173,7 +173,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ==============================================================================================================================
     // Tools Signature Pad
     // ==============================================================================================================================
-    
+
     Route::get('/signature', [ToolsController::class, 'signature'])->middleware('role:super_admin')->name('tools.signature');
     Route::post('/signature/save', [ToolsController::class, 'saveSignature'])->middleware('role:super_admin')->name('tools.signature.save');
 
@@ -218,8 +218,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::delete('/{doc}', [PengesahanController::class, 'destroy'])
             ->name('pengesahan.admin.destroy');
-    }); 
-    
+    });
+
     // ======================================================================
     // PENGESAHAN — ADMIN (Super Admin & Ketua)
     // ======================================================================
@@ -252,13 +252,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 
     // ======================================================================
-    // PROGRAM 
+    // PROGRAM
     // ======================================================================
 
     Route::get('/programs', [ProgramController::class, 'index'])
         ->middleware(['role:tim_bidang|tim_inti|super_admin'])
         ->name('programs.index');
-        
+
     Route::get('/programs/create', [ProgramController::class, 'create'])
         ->middleware(['role:tim_bidang'])
         ->name('programs.create');
@@ -270,8 +270,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/programs/{program}', [ProgramController::class, 'show'])
         ->middleware(['role:tim_bidang|tim_inti|super_admin'])
         ->name('programs.show');
-    
-    Route::delete('/programs/{program}', [ProgramController::class, 'hapus'])
+
+    Route::delete('/programs/{program}', [ProgramController::class, 'destroy'])
         ->middleware(['role:tim_bidang'])
         ->name('programs.destroy');
 
@@ -286,9 +286,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/programs/{program}', [ProgramController::class, 'update'])
         ->middleware(['role:tim_bidang'])
         ->name('programs.update');
-        
+
     // ======================================================================
-    // PROGRAM 
+    // PROGRAM
     // ======================================================================
 
 });

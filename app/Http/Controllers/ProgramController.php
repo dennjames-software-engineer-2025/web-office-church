@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Program;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class ProgramController extends Controller
 {
@@ -15,15 +17,14 @@ class ProgramController extends Controller
     /* List Program */
     public function index()
     {
-        $user = auth()->user();
+        $user = Auth::user();
 
-        if($user->hasRole('tim_bidang')) {
-            // Tim Bidang hanya lihat program mereka sendiri
-            $programs = Program::latest()->get();
+        if ($user->hasRole('tim_bidang')) {
+            $programs = Program::where('bidang_id', $user->bidang_id)->latest()->get();
         } else {
             $programs = Program::latest()->get();
         }
-        
+
         return view('programs.index', compact('programs'));
     }
 
@@ -43,15 +44,21 @@ class ProgramController extends Controller
             'tanggal_selesai'   => 'required|date|after_or_equal:tanggal_mulai',
         ]);
 
+        $user = Auth::user();
+
         $program = Program::create([
             'nama_program'      => $validated['nama_program'],
             'deskripsi'         => $validated['deskripsi'] ?? null,
             'tanggal_mulai'     => $validated['tanggal_mulai'],
             'tanggal_selesai'   => $validated['tanggal_selesai'],
             'status'            => 'draft',
+            'bidang_id'         => $user->bidang_id,
+            'created_by'        => $user->id,
         ]);
 
-        return redirect()->route('programs.show', $program)->with('success', 'Program berhasil dibuat');
+        return redirect()
+            ->route('programs.show', $program)
+            ->with('success', 'Program berhasil dibuat');
     }
 
     public function show(Program $program)

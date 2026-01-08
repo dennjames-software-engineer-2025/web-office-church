@@ -4,81 +4,58 @@ namespace App\Policies;
 
 use App\Models\Program;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class ProgramPolicy
 {
-    /**
-     * Melihat List Program
-     */
     public function viewAny(User $user): bool
     {
         return $user->hasAnyRole(['tim_inti', 'tim_bidang', 'super_admin']);
     }
 
-    /**
-     * Melihat Detail Program
-     */
     public function view(User $user, Program $program): bool
     {
-        return $user->hasAnyRole(['tim_inti', 'tim_bidang', 'super_admin']);
+        // super_admin & tim_inti boleh lihat semua
+        if ($user->hasAnyRole(['super_admin', 'tim_inti'])) {
+            return true;
+        }
+
+        // tim_bidang hanya boleh lihat program dalam bidang yang sama
+        return $user->hasRole('tim_bidang')
+            && $user->bidang_id !== null
+            && $program->bidang_id === $user->bidang_id;
     }
 
-    /**
-     * Update Program
-     * Hanya boleh dilakukan jika status masih 'draft'
-     */
     public function create(User $user): bool
     {
-        return $user->hasAnyRole(['tim_bidang', 'super_admin']);
+        // sesuai requirement: hanya tim_bidang yang membuat program
+        return $user->hasRole('tim_bidang');
     }
 
-    /**
-     * Update Program
-     * Hanya boleh dilakukan jika status masih 'draft'
-     */
     public function update(User $user, Program $program): bool
     {
-        return $program->status === 'draft' 
-        && $user->hasRole(['tim_bidang', 'super_admin']);
+        // Rule opsi A: hanya creator boleh edit, hanya saat draft
+        return $user->hasRole('tim_bidang')
+            && $program->status === 'draft'
+            && $program->created_by === $user->id;
     }
 
-    /**
-     * Determine whether the user can delete the model.
-     */
     public function delete(User $user, Program $program): bool
     {
-        return $program->status === 'draft' 
-        && $program->proposals()->count() === 0
-        && $user->hasRole(['tim_bidang', 'super_admin']);
+        // hanya creator, hanya draft, dan hanya jika belum ada proposal
+        return $user->hasRole('tim_bidang')
+            && $program->status === 'draft'
+            && $program->created_by === $user->id
+            && $program->proposals()->count() === 0;
     }
 
-    /**
-     * Mengganti status program
-     */
     public function changeStatus(User $user, Program $program): bool
     {
-        return $user->hasAnyRole([
-            'ketua',
-            'bendahara_1',
-            'bendahara_2',
-            'super_admin',
-        ]);
-    }
+        // super_admin full authority
+        if ($user->hasRole('super_admin')) {
+            return true;
+        }
 
-    /**
-     * Determine whether the user can restore the model.
-     */
-    public function restore(User $user, Program $program): bool
-    {
-        return false;
-    }
-
-    /**
-     * Determine whether the user can permanently delete the model.
-     */
-    public function forceDelete(User $user, Program $program): bool
-    {
-        return false;
+        // hanya ketua (jabatan) dari tim_inti yang boleh ubah status program
+        return $user->hasRole('tim_inti') && $user->jabatan === 'ketua';
     }
 }
