@@ -44,7 +44,7 @@ class Proposal extends Model
 
     public function pengaju()
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function files()
