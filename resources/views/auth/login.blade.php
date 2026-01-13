@@ -7,6 +7,23 @@
     <!-- Session Status -->
     <x-auth-session-status class="mb-4" :status="session('status')" />
 
+    @if (session('login_kedudukan'))
+        <div class="mb-4 p-3 rounded bg-gray-100 text-gray-700 text-sm flex items-center justify-between">
+            <div>
+                Login sebagai kedudukan: <span class="font-semibold">{{ strtoupper(str_replace('_', ' ', session('login_kedudukan'))) }}</span>
+            </div>
+            <a href="{{ route('welcome.kedudukan') }}" class="underline text-sm">
+                Ganti kedudukan
+            </a>
+        </div>
+    @endif
+
+    @if (session('error'))
+        <div class="mb-4 p-3 rounded bg-red-100 text-red-800 text-sm">
+            {{ session('error') }}
+        </div>
+    @endif
+
     <form method="POST" action="{{ route('login') }}">
         @csrf
 
@@ -48,9 +65,9 @@
                 {{ __('Log in') }}
             </x-primary-button>
             
-            <a href="{{ route('register') }}" class="btn btn-primary">
+            {{-- <a href="{{ route('register') }}" class="btn btn-primary">
                 {{ __('Register') }}
-            </a>
+            </a> --}}
         </div>
     </form>
 

@@ -16,8 +16,14 @@ class AuthenticatedSessionController extends Controller
     /**
      * Display the login view.
      */
-    public function create(): View
+    public function create()
     {
+        if (! session()->has('login_kedudukan')) {
+        return redirect()
+            ->route('welcome.kedudukan')
+            ->with('error', 'Silakan pilih kedudukan terlebih dahulu.');
+        }
+
         return view('auth.login');
     }
 
@@ -26,9 +32,18 @@ class AuthenticatedSessionController extends Controller
      */
     public function store(LoginRequest $request): RedirectResponse
     {
+        // Wajib pilih kedudukan dulu sebelum login
+        $selectedKedudukan = session('login_kedudukan');
+
+        if (! $selectedKedudukan) {
+            throw ValidationException::withMessages([
+                'email' => 'Silakan pilih Kedudukan terlebih dahulu sebelum login.',
+            ]);
+        }
+
         $request->authenticate();
 
-        // Mengambil user yang baru login 
+        // Mengambil user yang baru login
         $user = $request->user();
 
         // Memeriksa status User
@@ -43,15 +58,40 @@ class AuthenticatedSessionController extends Controller
             };
 
             throw ValidationException::withMessages([
-            'email' => __($message),
+                'email' => __($message),
             ]);
         }
 
-        // Kalau status sudah active lanjutkan seperti default breeze
+        // Validasi kedudukan (super_admin bypass)
+        if (! $user->hasRole('super_admin')) {
+
+            if (! $user->kedudukan) {
+                Auth::logout();
+
+                throw ValidationException::withMessages([
+                    'email' => 'Akun ini belum memiliki Kedudukan. Hubungi Super Admin.',
+                ]);
+            }
+
+            if ($user->kedudukan !== $selectedKedudukan) {
+                Auth::logout();
+
+                throw ValidationException::withMessages([
+                    'email' => 'Kedudukan login tidak sesuai. Silakan pilih Kedudukan yang benar.',
+                ]);
+            }
+        }
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        $user = $request->user();
+
+        if (! $user->hasRole('super_admin')) {
+            $request->session()->forget('url.intended');
+            return redirect()->route('dashboard');
+        }
+
+        return redirect()->intended(route('dashboard'));
     }
 
     /**

@@ -16,13 +16,36 @@ use App\Http\Controllers\UserManagementController;
 use App\Models\Proposal;
 use Illuminate\Http\Request;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+// Route::get('/', function () {
+//     return view('welcome');
+// });
 
 Route::get('/dashboard', function () {
     return view('dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
+
+// =======================================================================================================================================
+// LOGIN KEDUDUKAN
+// =======================================================================================================================================
+
+Route::get('/', function () {
+    return view('welcome-kedudukan');
+})->name('welcome.kedudukan');
+
+Route::get('/masuk/kedudukan/{kedudukan}', function (string $kedudukan) {
+    $allowed = ['dpp_inti', 'bgkp', 'lingkungan', 'sekretariat'];
+
+    abort_unless(in_array($kedudukan, $allowed, true), 404);
+
+    session(['login_kedudukan' => $kedudukan]);
+
+    return redirect()->route('login');
+})->name('login.kedudukan');
+
+
+// =======================================================================================================================================
+// LOGIN KEDUDUKAN
+// =======================================================================================================================================
 
 Route::middleware(['auth', 'verified'])->group(function () {
 
@@ -81,14 +104,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/users/{user}/reject', [UserApprovalController::class, 'reject'])->name('users.reject');
 
     // Create Tim Inti
-    Route::get('/users/create-tim-inti', [UserManagementController::class, 'createTimInti'])
+    Route::get('/users/create-tim-inti', [UserManagementController::class, 'create'])
         ->middleware(['verified', 'role:super_admin'])
-        ->name('users.create_inti');
+        ->name('users.create');
 
     // Store Tim Inti
-    Route::post('/users/create-inti', [UserManagementController::class, 'storeTimInti'])
+    Route::post('/users/create-inti', [UserManagementController::class, 'store'])
         ->middleware(['verified', 'role:super_admin'])
-        ->name('users.store_inti');
+        ->name('users.store');
 
     // Menampilkan halaman Manajemen User
     Route::get('/users', [UserManagementController::class, 'index'])

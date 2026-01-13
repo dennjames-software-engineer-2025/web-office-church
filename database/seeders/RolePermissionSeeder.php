@@ -2,80 +2,155 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 
 class RolePermissionSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
+        // Reset cache Spatie
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        // ==================================
-        // Deklarasi Permissions
-        // ==================================
-        $permissions = [ 
+        // =========================
+        // Permissions (ringkas tapi lengkap untuk alur Program/Proposal baru)
+        // =========================
+        $permissions = [
+            // Users & Masterdata
+            'users.manage',
+            'masterdata.manage',
 
-            // DOcument Permissions
-            'document.view_any',
-            'document.view_own_bidang',
-            'document.create',
-            'document.update_own',
-            'document.delete_own',
-            'document.restore',
-            'document.force_delete',
+            // Program
+            'program.create',
+            'program.view',
+            'program.update_pending',
+            'program.delete_pending',
+            'program.approve',          // ketua / wakil ketua (sesuai target kedudukan via policy)
+            'program.status.update',    // ubah status setelah approve
 
-            // User & Approval Permissions
-            'user.approve_registration',
-            'user.manage_tim_inti',
-            'user.manage_tim_bidang',
+            // Proposal
+            'proposal.upload',          // upload berkali-kali
+            'proposal.delete_rejected', // opsi B: boleh delete saat review/ditolak (nanti di policy)
+            'proposal.approve',         // ketua / wakil ketua (sesuai target kedudukan via policy)
+            'proposal.view_approved',   // bendahara view-only setelah approved
 
-            // Struktur Organisasi
-            'structure.manage_bidang',
-            'structure.manage_sie',
+            // Notulensi & Files
+            'notulensi.manage',
+            'notulensi.view',
+            'files.manage',
+            'files.view',
         ];
 
-        foreach ($permissions as $perm) {
-            Permission::firstOrCreate(['name' => $perm, 'guard_name' => 'web']);
+        foreach ($permissions as $name) {
+            Permission::firstOrCreate(['name' => $name, 'guard_name' => 'web']);
         }
 
-        // ==================================
-        // Deklarasi Roles
-        // ==================================
+        // =========================
+        // Roles
+        // =========================
+        $roles = [
+            'super_admin',
+            'ketua',
+            'wakil_ketua',
+            'sekretaris',
+            'bendahara',
+            'ketua_bidang',
+            'ketua_sie',
+            'ketua_lingkungan',
+            'wakil_ketua_lingkungan',
+            'anggota_komunitas',
+        ];
 
-        $superadmin = Role::firstOrCreate(['name' => 'super_admin']);
-        $timInti    = Role::firstOrCreate(['name' => 'tim_inti']);
-        $timBidang  = Role::firstOrCreate(['name' => 'tim_bidang']);
+        foreach ($roles as $name) {
+            Role::firstOrCreate(['name' => $name, 'guard_name' => 'web']);
+        }
 
-        // ==================================
-        // Assign Permissions to Each Roles
-        // ==================================
+        // =========================
+        // Assign Permissions
+        // =========================
 
-        // Super Admin mendapatkan semua Permissions
-        $superadmin->syncPermissions(Permission::all());
+        Role::findByName('super_admin', 'web')->syncPermissions(Permission::all());
 
-        // Permissions untuk Tim Inti
-        $timInti->syncPermissions([
-            'document.view_any',
-            'document.create',
-            'document.update_own',
-            'document.delete_own',
-            'document.restore',
-            'user.approve_registration',
-            'structure.manage_bidang',
-            'structure.manage_sie',
+        Role::findByName('ketua', 'web')->syncPermissions([
+            'program.view',
+            'program.approve',
+            'program.status.update',
+            'proposal.approve',
+            'proposal.view_approved',
+            'files.view',
+            'notulensi.view',
         ]);
 
-        // Permissions untuk Tim Bidang
-        $timBidang->syncPermissions([
-            'document.view_own_bidang',
-            'document.create',
-            'document.update_own',
-            'document.delete_own',
+        Role::findByName('wakil_ketua', 'web')->syncPermissions([
+            'program.view',
+            'program.approve',
+            'program.status.update',
+            'proposal.approve',
+            'proposal.view_approved',
+            'files.view',
+            'notulensi.view',
+        ]);
+
+        Role::findByName('sekretaris', 'web')->syncPermissions([
+            'program.view',
+            'files.manage',
+            'files.view',
+            'notulensi.manage',
+            'notulensi.view',
+        ]);
+
+        Role::findByName('bendahara', 'web')->syncPermissions([
+            'program.view',
+            'proposal.view_approved', // view-only untuk pencatatan
+            'files.view',
+            'notulensi.view',
+        ]);
+
+        Role::findByName('ketua_bidang', 'web')->syncPermissions([
+            'program.create',
+            'program.view',
+            'program.update_pending',
+            'program.delete_pending',
+            'proposal.upload',
+            'proposal.delete_rejected',
+            'files.view',
+            'notulensi.view',
+        ]);
+
+        Role::findByName('ketua_sie', 'web')->syncPermissions([
+            'program.create',
+            'program.view',
+            'program.update_pending',
+            'program.delete_pending',
+            'proposal.upload',
+            'proposal.delete_rejected',
+            'files.view',
+            'notulensi.view',
+        ]);
+
+        Role::findByName('ketua_lingkungan', 'web')->syncPermissions([
+            'program.view',
+            'files.view',
+            'notulensi.view',
+            // Ketua Lingkungan tidak approve (sesuai brief: larinya ke Ketua/Wakil Ketua DPP Inti)
+        ]);
+
+        Role::findByName('wakil_ketua_lingkungan', 'web')->syncPermissions([
+            'program.view',
+            'files.view',
+            'notulensi.view',
+            // Ketua Lingkungan tidak approve (sesuai brief: larinya ke Ketua/Wakil Ketua DPP Inti)
+        ]);
+
+        Role::findByName('anggota_komunitas', 'web')->syncPermissions([
+            'program.create',
+            'program.view',
+            'proposal.upload',
+            'proposal.delete_rejected',
+            'files.view',
+            'notulensi.view',
         ]);
     }
 }

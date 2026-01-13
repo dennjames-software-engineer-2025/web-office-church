@@ -120,7 +120,6 @@
         </div>
     </div>
 
-
     {{-- SweetAlert Delete --}}
     <script>
         function deleteTemplate(id) {

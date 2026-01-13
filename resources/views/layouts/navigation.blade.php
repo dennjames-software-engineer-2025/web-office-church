@@ -23,13 +23,15 @@
         </a>
 
         {{-- CRUD User --}}
-        <a href="{{ route('users.index') }}"
-            class="flex items-center px-6 py-3 text-sm font-medium
-        {{ request()->routeIs('users.*') && !request()->routeIs('users.pending')
-                ? 'bg-blue-50 text-blue-600 border-l-4 border-blue-600'
-                : 'text-gray-700 hover:bg-gray-100' }}">
-            <i class="fas fa-users mr-3"></i> Tim Inti
-        </a>
+        @role('super_admin')
+            <a href="{{ route('users.index') }}"
+                class="flex items-center px-6 py-3 text-sm font-medium
+            {{ request()->routeIs('users.*') && !request()->routeIs('users.pending')
+                    ? 'bg-blue-50 text-blue-600 border-l-4 border-blue-600'
+                    : 'text-gray-700 hover:bg-gray-100' }}">
+                <i class="fas fa-users mr-3"></i> Buat Akun User
+            </a>
+        @endrole
 
         {{-- CRUD Template --}}
         <a href="{{ route('templates.index') }}"
