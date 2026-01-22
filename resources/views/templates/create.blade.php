@@ -1,88 +1,106 @@
 <x-app-layout>
-
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            Upload Template Baru
-        </h2>
+        <div class="flex flex-col gap-1">
+            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+                Upload Template Baru
+            </h2>
+            <p class="text-sm text-gray-500">
+                Upload file template (PDF/Word/Excel/PPT). Untuk Tim Inti bisa memilih dibagikan ke bidang.
+            </p>
+        </div>
     </x-slot>
 
     <div class="py-6">
-        <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
+        <div class="max-w-3xl mx-auto sm:px-6 lg:px-8 space-y-4">
 
-            <div class="bg-white shadow sm:rounded-lg p-8">
+            <div>
+                <a href="{{ route('templates.index') }}"
+                   class="inline-flex items-center px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-800">
+                    ← Kembali
+                </a>
+            </div>
 
-                {{-- Error global --}}
-                @if ($errors->any())
-                    <div class="p-4 mb-4 text-red-700 bg-red-100 rounded">
-                        <b>Gagal menyimpan template:</b>
-                        <ul class="mt-2 list-disc list-inside">
-                            @foreach ($errors->all() as $e)
-                                <li>{{ $e }}</li>
-                            @endforeach
-                        </ul>
-                    </div>
-                @endif
+            <div class="bg-white shadow sm:rounded-lg">
+                <div class="p-6 space-y-6">
 
-                <form method="POST" action="{{ route('templates.store') }}"
-                      enctype="multipart/form-data">
-                    @csrf
-
-                    {{-- Judul --}}
-                    <div class="mb-6">
-                        <label class="block text-sm font-medium text-gray-700">Judul Template</label>
-                        <input type="text" name="title"
-                               class="mt-1 block w-full border rounded p-2"
-                               value="{{ old('title') }}" required>
-                    </div>
-
-                    {{-- File --}}
-                    <div class="mb-6">
-                        <label class="block text-sm font-medium text-gray-700">File Template</label>
-                        <input type="file" name="file"
-                               class="mt-1 block w-full border rounded p-2"
-                               accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
-                               required>
-                        <p class="text-gray-500 text-sm mt-1">Max 10 MB</p>
-                    </div>
-
-                    {{-- Checkbox share bidang (khusus Super Admin & Tim Inti) --}}
-                    @hasanyrole('super_admin|tim_inti')
-                        <div class="mb-6">
-                            <label class="font-semibold text-gray-800">
-                                Share Template ke Bidang:
-                            </label>
-
-                            <div class="grid grid-cols-2 gap-2 mt-2">
-                                @foreach($bidangs as $b)
-                                    <label class="flex items-center gap-2">
-                                        <input type="checkbox" name="share_bidangs[]"
-                                               value="{{ $b->id }}">
-                                        {{ $b->nama_bidang }}
-                                    </label>
+                    {{-- Error global --}}
+                    @if ($errors->any())
+                        <div class="p-4 text-red-700 bg-red-50 border border-red-200 rounded-lg">
+                            <div class="font-semibold">Gagal menyimpan template:</div>
+                            <ul class="mt-2 list-disc list-inside text-sm">
+                                @foreach ($errors->all() as $e)
+                                    <li>{{ $e }}</li>
                                 @endforeach
-                            </div>
-
-                            <p class="text-gray-500 text-sm mt-1">
-                                Jika tidak memilih apapun → Template hanya untuk Tim Inti & Super Admin.
-                            </p>
+                            </ul>
                         </div>
-                    @endhasanyrole
+                    @endif
 
-                    <div class="flex justify-end gap-3">
-                        <a href="{{ route('templates.index') }}"
-                           class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">
-                            Batal
-                        </a>
+                    <form method="POST" action="{{ route('templates.store') }}" enctype="multipart/form-data" class="space-y-6">
+                        @csrf
 
-                        <button class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-                            Upload Template
-                        </button>
-                    </div>
+                        {{-- Judul --}}
+                        <div>
+                            <x-input-label for="title" value="Judul Template" />
+                            <x-text-input id="title"
+                                          name="title"
+                                          type="text"
+                                          class="mt-1 block w-full"
+                                          value="{{ old('title') }}"
+                                          required />
+                            <x-input-error class="mt-2" :messages="$errors->get('title')" />
+                        </div>
 
-                </form>
+                        {{-- File --}}
+                        <div>
+                            <x-input-label for="file" value="File Template" />
+                            <input id="file"
+                                   name="file"
+                                   type="file"
+                                   accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                                   class="mt-1 block w-full rounded-lg border-gray-300"
+                                   required />
+                            <x-input-error class="mt-2" :messages="$errors->get('file')" />
+                            <div class="text-xs text-gray-500 mt-2">Maks 10 MB.</div>
+                        </div>
+
+                        {{-- Share bidang (khusus tim inti / super admin) --}}
+                        @hasanyrole('super_admin|ketua|wakil_ketua|sekretaris|bendahara')
+                            <div class="border rounded-lg p-4 bg-gray-50">
+                                <div class="font-semibold text-gray-900 mb-2">
+                                    Bagikan ke Bidang (opsional)
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    @foreach($bidangs as $b)
+                                        <label class="flex items-center gap-2 text-sm">
+                                            <input type="checkbox" name="share_bidangs[]" value="{{ $b->id }}"
+                                                {{ in_array($b->id, old('share_bidangs', [])) ? 'checked' : '' }}>
+                                            <span>{{ $b->nama_bidang }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
+
+                                <div class="text-xs text-gray-500 mt-2">
+                                    Jika tidak dicentang, template inti hanya terlihat oleh Tim Inti & Super Admin.
+                                </div>
+                            </div>
+                        @endhasanyrole
+
+                        <div class="flex justify-end gap-2">
+                            <a href="{{ route('templates.index') }}"
+                               class="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-800">
+                                Batal
+                            </a>
+
+                            <button class="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium">
+                                Simpan
+                            </button>
+                        </div>
+                    </form>
+
+                </div>
             </div>
 
         </div>
     </div>
-
 </x-app-layout>

@@ -3,11 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Bidang;
+use App\Models\Folder;
 use App\Models\Template;
+use Illuminate\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\View\View;
 
 class TemplateController extends Controller
 {
@@ -18,40 +19,34 @@ class TemplateController extends Controller
     {
         $user = Auth::user();
 
-        // For share checkbox
+        $isInti = $user->hasAnyRole(['super_admin','ketua','wakil_ketua','sekretaris','bendahara']);
         $bidangs = Bidang::orderBy('nama_bidang')->get();
 
-        /* ===========================================================
-         * TEMPLATE INTI (bidang_id = NULL)
-         * ===========================================================
-         * Super Admin / Tim Inti → bisa melihat semua template inti
-         * Tim Bidang → hanya template inti yang dibagikan ke bidangnya
-         */
+        // TEMPLATE INTI: bidang_id NULL
         $templatesInti = Template::with(['uploader', 'bidangs'])
             ->whereNull('bidang_id')
-            ->when($user->hasRole('tim_bidang'), function ($q) use ($user) {
+            ->when(! $isInti, function ($q) use ($user) {
+                // non-inti hanya lihat inti yang dishare ke bidangnya
                 $q->whereHas('bidangs', fn($b) => $b->where('bidang_id', $user->bidang_id));
             })
             ->latest()
             ->get();
 
-
-        /* ===========================================================
-         * TEMPLATE BIDANG (bidang_id != NULL)
-         * ===========================================================
-         * Super Admin → melihat semua
-         * Tim Inti → melihat semua
-         * Tim Bidang → hanya bidang dia sendiri
-         */
+        // TEMPLATE BIDANG: bidang_id NOT NULL
         $templatesBidang = Template::with(['uploader', 'bidang'])
             ->whereNotNull('bidang_id')
-            ->when($user->hasRole('tim_bidang'), function ($q) use ($user) {
+            ->when(! $isInti, function ($q) use ($user) {
+                // non-inti hanya lihat template bidang sendiri
                 $q->where('bidang_id', $user->bidang_id);
             })
             ->latest()
             ->get();
 
-        return view('templates.index', compact('templatesInti', 'templatesBidang', 'bidangs'));
+        $folders = $user->can('files.manage')
+            ? Folder::where('created_by', $user->id)->orderBy('name')->get()
+            : collect();
+
+        return view('templates.index', compact('templatesInti','templatesBidang','bidangs','folders'));
     }
 
     /**
@@ -70,43 +65,21 @@ class TemplateController extends Controller
     {
         $user = Auth::user();
 
+        $isInti = $user->hasAnyRole(['super_admin','ketua','wakil_ketua','sekretaris','bendahara']);
+        $isNonInti = $user->hasAnyRole(['ketua_bidang','ketua_sie','anggota_komunitas','ketua_lingkungan','wakil_ketua_lingkungan']);
+
         $validated = $request->validate([
-            'title'         => ['required', 'string', 'max:255'],
-            'file'          => ['required', 'file', 'max:10240', 'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx'],
-            'share_bidangs' => ['nullable', 'array'],
-            'share_bidangs.*' => ['integer', 'exists:bidangs,id'],
+            'title' => ['required','string','max:255'],
+            'file'  => ['required','file','max:10240','mimes:pdf,doc,docx,xls,xlsx,ppt,pptx'],
+            'share_bidangs' => ['nullable','array'],
+            'share_bidangs.*' => ['integer','exists:bidangs,id'],
         ]);
 
         $file = $request->file('file');
-        $path = $file->store('templates');
 
-        /* ===========================================================
-         * TEMPLATE BIDANG (Tim Bidang)
-         * ===========================================================
-         */
-        if ($user->hasRole('tim_bidang')) {
+        // simpan ke disk public biar aman untuk preview (nanti langkah 6)
+        $path = $file->store('templates', 'public');
 
-            $template = Template::create([
-                'title'         => $validated['title'],
-                'original_name' => $file->getClientOriginalName(),
-                'path'          => $path,
-                'mime_type'     => $file->getClientMimeType(),
-                'file_type'     => $file->getClientOriginalExtension(),
-                'size'          => $file->getSize(),
-                'uploaded_by'   => $user->id,
-                'bidang_id'     => $user->bidang_id, // PRIVATE to bidang
-            ]);
-
-            return redirect()
-                ->route('templates.index')
-                ->with('status', 'Template Bidang berhasil diupload');
-        }
-
-        /* ===========================================================
-         * TEMPLATE INTI (Super Admin & Tim Inti)
-         * ===========================================================
-         * bidang_id = NULL
-         */
         $template = Template::create([
             'title'         => $validated['title'],
             'original_name' => $file->getClientOriginalName(),
@@ -115,16 +88,17 @@ class TemplateController extends Controller
             'file_type'     => $file->getClientOriginalExtension(),
             'size'          => $file->getSize(),
             'uploaded_by'   => $user->id,
-            'bidang_id'     => null,
+
+            // inti => null, non-inti => bidang user
+            'bidang_id'     => $isInti ? null : $user->bidang_id,
         ]);
 
-        // Share ke beberapa bidang
-        $shareBidangs = $request->input('share_bidangs', []);
-        $template->bidangs()->sync($shareBidangs);
+        // hanya inti yang boleh share
+        if ($isInti) {
+            $template->bidangs()->sync($request->input('share_bidangs', []));
+        }
 
-        return redirect()
-            ->route('templates.index')
-            ->with('status', 'Template Inti berhasil diupload');
+        return redirect()->route('templates.index')->with('status', 'Template berhasil diupload');
     }
 
     /**
@@ -132,11 +106,17 @@ class TemplateController extends Controller
      */
     public function download(Template $template)
     {
-        if (! Storage::exists($template->path)) {
+        $disk = Storage::disk('public');
+
+        if (! $disk->exists($template->path)) {
             return back()->with('error', 'File template tidak ditemukan');
         }
 
-        return Storage::download($template->path, $template->original_name);
+        return response()->download(
+            $disk->path($template->path),
+            $template->original_name,
+            ['Content-Type' => $template->mime_type ?? 'application/octet-stream']
+        );
     }
 
     /**
@@ -144,16 +124,17 @@ class TemplateController extends Controller
      */
     public function stream(Template $template)
     {
-        if (!Storage::exists($template->path)) {
+        $disk = Storage::disk('public');
+
+        if (! $disk->exists($template->path)) {
             abort(404, 'File tidak ditemukan.');
         }
 
-        // Hanya PDF untuk inline PDF viewer
         if (strtolower($template->file_type) !== 'pdf') {
             return redirect()->route('templates.view', $template);
         }
 
-        return response()->file(Storage::path($template->path), [
+        return response()->file($disk->path($template->path), [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="'.$template->original_name.'"',
         ]);
@@ -164,7 +145,9 @@ class TemplateController extends Controller
      */
     public function show(Template $template)
     {
-        if (! Storage::exists($template->path)) {
+        $disk = Storage::disk('public');
+
+        if (! $disk->exists($template->path)) {
             return back()->with('error', 'File tidak ditemukan');
         }
 
@@ -175,12 +158,13 @@ class TemplateController extends Controller
 
     public function view(Template $template)
     {
-        if (!Storage::exists($template->path)) {
+        $disk = Storage::disk('public');
+
+        if (! $disk->exists($template->path)) {
             abort(404);
         }
 
-        $url = url(Storage::url($template->path));
-
+        $url = asset('storage/'.$template->path); // publik
         return redirect("https://docs.google.com/gview?url={$url}&embedded=true");
     }
 

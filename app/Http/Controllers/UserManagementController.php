@@ -38,13 +38,20 @@ class UserManagementController extends Controller
 
     public function edit(User $user): View
     {
-        // ambil semua bidang + sies (buat dropdown)
-        $bidangs = Bidang::with('sies')->orderBy('nama_bidang')->get();
+        // ambil semua bidang aktif (untuk dropdown + filter di client)
+        $bidangs = Bidang::query()
+            ->select('id', 'nama_bidang', 'kedudukan', 'is_active')
+            ->where('is_active', true)
+            ->orderBy('kedudukan')
+            ->orderBy('nama_bidang')
+            ->get();
 
-        // optional: list sies untuk bidang yang sedang dipilih user
-        $sies = $user->bidang_id
-            ? Sie::where('bidang_id', $user->bidang_id)->orderBy('nama_sie')->get()
-            : collect();
+        // ambil semua sie aktif (untuk dropdown + filter by bidang di client)
+        $sies = Sie::query()
+            ->select('id', 'nama_sie', 'bidang_id', 'is_active')
+            ->where('is_active', true)
+            ->orderBy('nama_sie')
+            ->get();
 
         return view('users.edit', compact('user', 'bidangs', 'sies'));
     }
@@ -52,15 +59,17 @@ class UserManagementController extends Controller
     public function update(Request $request, User $user): RedirectResponse
     {
         $request->merge([
-            'email' => strtolower(trim($request->email)),
-            'name'  => trim($request->name),
+            'email' => strtolower(trim((string)$request->email)),
+            'name'  => trim((string)$request->name),
         ]);
 
         // daftar jabatan valid per kedudukan
+        // NOTE: ketua_bidang dibuat berlaku untuk dpp_inti,bgkp,lingkungan
+        // ketua_sie tetap khusus dpp_inti (karena sie hanya ada di struktur DPP)
         $jabatanByKedudukan = [
             'dpp_inti' => ['ketua','wakil_ketua','sekretaris_1','sekretaris_2','bendahara_1','bendahara_2','ketua_bidang','ketua_sie'],
-            'bgkp'     => ['ketua','wakil_ketua','sekretaris_1','sekretaris_2','bendahara_1','bendahara_2'],
-            'lingkungan' => ['ketua_lingkungan','wakil_ketua_lingkungan','anggota_komunitas'],
+            'bgkp'     => ['ketua','wakil_ketua','sekretaris_1','sekretaris_2','bendahara_1','bendahara_2','ketua_bidang'],
+            'lingkungan' => ['ketua_lingkungan','wakil_ketua_lingkungan','anggota_komunitas','ketua_bidang'],
             'sekretariat' => ['sekretariat'],
         ];
 
@@ -73,8 +82,20 @@ class UserManagementController extends Controller
             'status'    => ['required', 'in:pending,active,rejected,suspended'],
             'kedudukan' => ['required', Rule::in(array_keys($jabatanByKedudukan))],
             'jabatan'   => ['required', 'string'],
-            'bidang_id' => ['nullable', 'integer', 'exists:bidangs,id'],
-            'sie_id'    => ['nullable', 'integer', 'exists:sies,id'],
+
+            // bidang harus sesuai kedudukan
+            'bidang_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('bidangs', 'id')->where(fn($q) => $q->where('kedudukan', $request->kedudukan)),
+            ],
+
+            // sie harus sesuai bidang_id (kalau bidang_id ada)
+            'sie_id'    => [
+                'nullable',
+                'integer',
+                Rule::exists('sies', 'id')->where(fn($q) => $q->where('bidang_id', $request->bidang_id)),
+            ],
 
             // password opsional saat edit
             'password'  => ['nullable', 'confirmed', Rules\Password::defaults()],
@@ -88,27 +109,28 @@ class UserManagementController extends Controller
                 ->withInput();
         }
 
-        // Validasi relasi bidang/sie sesuai jabatan
+        // Aturan kebutuhan bidang/sie
+        $needsBidang = in_array($validated['jabatan'], ['ketua_bidang','ketua_sie'], true);
+        $needsSie    = ($validated['jabatan'] === 'ketua_sie');
+
         $bidangId = null;
         $sieId    = null;
 
-        if ($validated['jabatan'] === 'ketua_bidang') {
+        if ($needsBidang) {
             if (empty($validated['bidang_id'])) {
-                return back()->withErrors(['bidang_id' => 'Bidang wajib dipilih untuk Ketua Bidang.'])->withInput();
+                return back()->withErrors(['bidang_id' => 'Bidang wajib dipilih untuk jabatan ini.'])->withInput();
             }
             $bidangId = (int) $validated['bidang_id'];
         }
 
-        if ($validated['jabatan'] === 'ketua_sie') {
+        if ($needsSie) {
             if (empty($validated['sie_id'])) {
                 return back()->withErrors(['sie_id' => 'Sie wajib dipilih untuk Ketua Sie.'])->withInput();
             }
-            $sie = Sie::with('bidang')->find((int) $validated['sie_id']);
-            if (! $sie) {
-                return back()->withErrors(['sie_id' => 'Sie tidak valid.'])->withInput();
-            }
-            $sieId    = $sie->id;
-            $bidangId = $sie->bidang_id; // bidang ikut dari sie
+
+            // Karena validation rule sudah memastikan sie_id belongs to bidang_id,
+            // di sini cukup set id-nya
+            $sieId = (int) $validated['sie_id'];
         }
 
         // mapping jabatan -> role (harus sama dengan store())
@@ -141,8 +163,7 @@ class UserManagementController extends Controller
         $user->bidang_id = $bidangId;
         $user->sie_id    = $sieId;
 
-        // team_type boleh kamu putuskan:
-        // kalau mau sederhanakan: null saja
+        // team_type boleh kamu putuskan
         $user->team_type = null;
 
         if (! empty($validated['password'])) {
@@ -161,7 +182,6 @@ class UserManagementController extends Controller
 
     public function show(User $user): View
     {
-        // Memastikan relasi
         $user->load(['bidang', 'sie', 'roles']);
 
         return view('users.show', compact('user'));
@@ -170,25 +190,21 @@ class UserManagementController extends Controller
     public function destroy(Request $request, User $user): RedirectResponse
     {
         // Tidak boleh menghapus akun sendiri
-        if ($request->user()-> id === $user->id) {
+        if ($request->user()->id === $user->id) {
             return back()->with('error', 'Anda tidak dapat menghapus akun sendiri');
         }
 
-        // Validasi alasan hapus akun 
         $data = $request->validate([
             'alasan_dihapus' => ['required', 'string', 'max:1000'],
         ]);
 
-        // Simpan alasan, lalu menerapkan soft delete
         $user->alasan_dihapus = $data['alasan_dihapus'];
         $user->save();
 
-        // Kirim email ke User 
         if ($user->email) {
             Mail::to($user->email)->send(new UserDeletedMail($user));
         }
 
-        // Implementasi Soft Delete
         $user->delete();
 
         return redirect()->route('users.index')->with('status', 'Akun User berhasil dihapus');
@@ -200,15 +216,23 @@ class UserManagementController extends Controller
 
     public function create(): View
     {
-        $bidangs = Bidang::orderBy('nama_bidang')->get();
-        $sies    = Sie::orderBy('nama_sie')->get(['id','nama_sie','bidang_id']);
+        // semua bidang aktif + ada kedudukan untuk filter di client
+        $bidangs = Bidang::query()
+            ->select('id','nama_bidang','kedudukan','is_active')
+            ->where('is_active', true)
+            ->orderBy('kedudukan')
+            ->orderBy('nama_bidang')
+            ->get();
+
+        // semua sie aktif, nanti difilter berdasarkan bidang_id
+        $sies = Sie::query()
+            ->select('id','nama_sie','bidang_id','is_active')
+            ->where('is_active', true)
+            ->orderBy('nama_sie')
+            ->get();
 
         return view('users.create-inti', compact('bidangs', 'sies'));
     }
-
-    // =====================================================================================================
-    // End Method Create
-    // =====================================================================================================
 
     // =====================================================================================================
     // Method Store
@@ -217,23 +241,12 @@ class UserManagementController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $request->merge([
-            'email' => strtolower(trim($request->email)),
-            'name'  => trim($request->name),
+            'email' => strtolower(trim((string)$request->email)),
+            'name'  => trim((string)$request->name),
         ]);
 
-        // 1) daftar jabatan yang sah
-        $allJabatan = [
-            // DPP Inti / BGKP
-            'ketua','wakil_ketua','sekretaris_1','sekretaris_2','bendahara_1','bendahara_2',
-            // DPP (Bidang/Sie)
-            'ketua_bidang','ketua_sie',
-            // Lingkungan
-            'ketua_lingkungan','wakil_ketua_lingkungan','anggota_komunitas',
-            // Sekretariat
-            'sekretariat',
-        ];
-
-        // 2) jabatan yang diperbolehkan per kedudukan
+        // jabatan yang diperbolehkan per kedudukan
+        // NOTE: ketua_bidang dibuat berlaku untuk dpp_inti,bgkp,lingkungan
         $allowedByKedudukan = [
             'dpp_inti' => [
                 'ketua','wakil_ketua','sekretaris_1','sekretaris_2','bendahara_1','bendahara_2',
@@ -241,9 +254,11 @@ class UserManagementController extends Controller
             ],
             'bgkp' => [
                 'ketua','wakil_ketua','sekretaris_1','sekretaris_2','bendahara_1','bendahara_2',
+                'ketua_bidang',
             ],
             'lingkungan' => [
                 'ketua_lingkungan','wakil_ketua_lingkungan','anggota_komunitas',
+                'ketua_bidang',
             ],
             'sekretariat' => [
                 'sekretariat',
@@ -251,54 +266,54 @@ class UserManagementController extends Controller
         ];
 
         $validated = $request->validate([
-        'name'      => ['required', 'string', 'max:255'],
-        'email'     => ['required', 'email', 'max:255', Rule::unique('users', 'email')->whereNull('deleted_at')],
-        'kedudukan' => ['required', 'in:dpp_inti,bgkp,lingkungan,sekretariat'],
-        'jabatan'   => ['required', 'in:ketua,wakil_ketua,sekretaris_1,sekretaris_2,bendahara_1,bendahara_2,ketua_bidang,ketua_sie,ketua_lingkungan,wakil_ketua_lingkungan,anggota_komunitas,sekretariat'],
-        'password'  => ['required', 'confirmed', Rules\Password::defaults()],
+            'name'      => ['required', 'string', 'max:255'],
+            'email'     => ['required', 'email', 'max:255', Rule::unique('users', 'email')->whereNull('deleted_at')],
+            'kedudukan' => ['required', Rule::in(array_keys($allowedByKedudukan))],
+            'jabatan'   => ['required', 'string'],
+            'password'  => ['required', 'confirmed', Rules\Password::defaults()],
 
-        'bidang_id' => ['nullable', 'integer', Rule::exists('bidangs', 'id')],
-        'sie_id'    => ['nullable', 'integer', Rule::exists('sies', 'id')],
-    ]);
+            // bidang harus sesuai kedudukan
+            'bidang_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('bidangs', 'id')->where(fn($q) => $q->where('kedudukan', $request->kedudukan)),
+            ],
 
-    // kunci jabatan sesuai kedudukan
-    $allowedByKedudukan = [
-        'dpp_inti' => ['ketua','wakil_ketua','sekretaris_1','sekretaris_2','bendahara_1','bendahara_2','ketua_bidang','ketua_sie'],
-        'bgkp' => ['ketua','wakil_ketua','sekretaris_1','sekretaris_2','bendahara_1','bendahara_2'],
-        'lingkungan' => ['ketua_lingkungan','wakil_ketua_lingkungan','anggota_komunitas'],
-        'sekretariat' => ['sekretariat'],
-    ];
+            // sie harus sesuai bidang_id (kalau bidang_id ada)
+            'sie_id'    => [
+                'nullable',
+                'integer',
+                Rule::exists('sies', 'id')->where(fn($q) => $q->where('bidang_id', $request->bidang_id)),
+            ],
+        ]);
 
-    if (!in_array($validated['jabatan'], $allowedByKedudukan[$validated['kedudukan']] ?? [], true)) {
-        return back()->withErrors(['jabatan' => 'Jabatan tidak sesuai dengan kedudukan yang dipilih.'])->withInput();
-    }
-
-    // aturan bidang/sie
-    if ($validated['jabatan'] === 'ketua_bidang') {
-        if (empty($validated['bidang_id'])) {
-            return back()->withErrors(['bidang_id' => 'Bidang wajib dipilih untuk Ketua Bidang.'])->withInput();
-        }
-        $validated['sie_id'] = null;
-    }
-
-    if ($validated['jabatan'] === 'ketua_sie') {
-        if (empty($validated['bidang_id'])) {
-            return back()->withErrors(['bidang_id' => 'Bidang wajib dipilih untuk Ketua Sie.'])->withInput();
-        }
-        if (empty($validated['sie_id'])) {
-            return back()->withErrors(['sie_id' => 'Sie wajib dipilih untuk Ketua Sie.'])->withInput();
+        // kunci jabatan sesuai kedudukan
+        if (! in_array($validated['jabatan'], $allowedByKedudukan[$validated['kedudukan']] ?? [], true)) {
+            return back()->withErrors(['jabatan' => 'Jabatan tidak sesuai dengan kedudukan yang dipilih.'])->withInput();
         }
 
-        $ok = Sie::where('id', $validated['sie_id'])
-            ->where('bidang_id', $validated['bidang_id'])
-            ->exists();
+        // Aturan kebutuhan bidang/sie
+        $needsBidang = in_array($validated['jabatan'], ['ketua_bidang','ketua_sie'], true);
+        $needsSie    = ($validated['jabatan'] === 'ketua_sie');
 
-        if (! $ok) {
-            return back()->withErrors(['sie_id' => 'Sie yang dipilih tidak termasuk dalam Bidang tersebut.'])->withInput();
+        if (! $needsBidang) {
+            $validated['bidang_id'] = null;
+            $validated['sie_id'] = null;
+        } else {
+            if (empty($validated['bidang_id'])) {
+                return back()->withErrors(['bidang_id' => 'Bidang wajib dipilih untuk jabatan ini.'])->withInput();
+            }
+            if (! $needsSie) {
+                $validated['sie_id'] = null;
+            } else {
+                if (empty($validated['sie_id'])) {
+                    return back()->withErrors(['sie_id' => 'Sie wajib dipilih untuk Ketua Sie.'])->withInput();
+                }
+                // rule validation sudah memastikan sie_id belongs to bidang_id
+            }
         }
-    }
 
-        // 5) mapping jabatan -> role (punyamu sudah OK)
+        // mapping jabatan -> role
         $role = match (true) {
             $validated['jabatan'] === 'ketua' => 'ketua',
             $validated['jabatan'] === 'wakil_ketua' => 'wakil_ketua',
@@ -313,11 +328,10 @@ class UserManagementController extends Controller
             default => null,
         };
 
-        if (!$role) {
+        if (! $role) {
             return back()->withErrors(['jabatan' => 'Jabatan tidak valid.'])->withInput();
         }
 
-        // 6) simpan user
         $user = User::create([
             'name'      => $validated['name'],
             'email'     => $validated['email'],

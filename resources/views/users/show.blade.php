@@ -11,10 +11,12 @@
                     Kembali
                 </a>
 
-                <a href="{{ route('users.edit', $user) }}"
-                   class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700">
-                    Edit
-                </a>
+                @can('users.manage')
+                    <a href="{{ route('users.edit', $user) }}"
+                       class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700">
+                        Edit
+                    </a>
+                @endcan
             </div>
         </div>
     </x-slot>
@@ -80,7 +82,9 @@
                         <dt class="text-sm font-medium text-gray-500">Role (Spatie)</dt>
                         <dd class="mt-1 text-sm text-gray-900">
                             @php
-                                $roles = $user->roles->pluck('name')->map(fn($r) => str_replace('_',' ', $r))->map('ucwords');
+                                $roles = $user->roles->pluck('name')
+                                    ->map(fn($r) => str_replace('_',' ', $r))
+                                    ->map('ucwords');
                             @endphp
                             {{ $roles->isEmpty() ? '-' : $roles->join(', ') }}
                         </dd>
@@ -113,37 +117,39 @@
             </div>
 
             {{-- Card: Danger Zone --}}
-            <div class="bg-white p-6 sm:p-8 shadow sm:rounded-lg border border-red-100">
-                <h4 class="text-lg font-semibold text-gray-900">Danger Zone</h4>
-                <p class="text-sm text-gray-600 mt-1">
-                    Menghapus akun akan melakukan <span class="font-semibold">soft delete</span>. Anda wajib mengisi alasan penghapusan.
-                </p>
+            @can('users.manage')
+                <div class="bg-white p-6 sm:p-8 shadow sm:rounded-lg border border-red-100">
+                    <h4 class="text-lg font-semibold text-gray-900">Danger Zone</h4>
+                    <p class="text-sm text-gray-600 mt-1">
+                        Menghapus akun akan melakukan <span class="font-semibold">soft delete</span>. Anda wajib mengisi alasan penghapusan.
+                    </p>
 
-                <form id="deleteForm" method="POST" action="{{ route('users.destroy', $user) }}" class="mt-6">
-                    @csrf
-                    @method('DELETE')
+                    <form id="deleteForm" method="POST" action="{{ route('users.destroy', $user) }}" class="mt-6">
+                        @csrf
+                        @method('DELETE')
 
-                    <div>
-                        <x-input-label for="alasan_dihapus" value="Alasan Penghapusan" />
-                        <textarea
-                            name="alasan_dihapus"
-                            id="alasan_dihapus"
-                            rows="4"
-                            class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
-                            placeholder="Contoh: Akun tidak digunakan lagi / terjadi pergantian personel / dll"
-                            required>{{ old('alasan_dihapus') }}</textarea>
-                        <x-input-error :messages="$errors->get('alasan_dihapus')" class="mt-2" />
-                    </div>
+                        <div>
+                            <x-input-label for="alasan_dihapus" value="Alasan Penghapusan" />
+                            <textarea
+                                name="alasan_dihapus"
+                                id="alasan_dihapus"
+                                rows="4"
+                                class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                                placeholder="Contoh: Akun tidak digunakan lagi / terjadi pergantian personel / dll"
+                                required>{{ old('alasan_dihapus') }}</textarea>
+                            <x-input-error :messages="$errors->get('alasan_dihapus')" class="mt-2" />
+                        </div>
 
-                    <div class="mt-4 flex justify-end">
-                        <button type="button"
-                                onclick="confirmDelete()"
-                                class="inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-700">
-                            Hapus Akun
-                        </button>
-                    </div>
-                </form>
-            </div>
+                        <div class="mt-4 flex justify-end">
+                            <button type="button"
+                                    onclick="confirmDelete()"
+                                    class="inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-700">
+                                Hapus Akun
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            @endcan
 
         </div>
     </div>

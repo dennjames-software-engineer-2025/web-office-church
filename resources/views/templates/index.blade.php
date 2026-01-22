@@ -1,219 +1,458 @@
 <x-app-layout>
-
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            Manajemen Template
-        </h2>
+        <div class="flex flex-col gap-1">
+            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+                Manajemen Template
+            </h2>
+            <p class="text-sm text-gray-500">
+                Lihat, unduh, dan kelola template. Gunakan pencarian untuk cepat menemukan template.
+            </p>
+        </div>
     </x-slot>
 
     <div class="py-6">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-4">
 
-            {{-- Upload --}}
-            <div>
-                <a href="{{ route('templates.create') }}"
-                   class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-                    + Upload Template
-                </a>
+            {{-- TOP BAR --}}
+            <div class="bg-white shadow sm:rounded-lg p-4">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div class="text-sm text-gray-600">
+                        Total:
+                        <span class="font-semibold text-gray-900">
+                            {{ ($templatesInti?->count() ?? 0) + ($templatesBidang?->count() ?? 0) }}
+                        </span>
+                        template
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
+                        {{-- Search --}}
+                        <div class="relative">
+                            <input
+                                id="tplSearch"
+                                type="text"
+                                placeholder="Cari judul / uploader / bidang..."
+                                class="w-full sm:w-80 pl-10 pr-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+                            >
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 21l-4.3-4.3"/>
+                                    <circle cx="11" cy="11" r="7"/>
+                                </svg>
+                            </span>
+                        </div>
+
+                        {{-- Upload --}}
+                        <a href="{{ route('templates.create') }}"
+                           class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 text-sm font-medium">
+                            <span class="text-lg leading-none">＋</span>
+                            Upload Template
+                        </a>
+                    </div>
+                </div>
             </div>
 
-
-            {{-- ===================================================== --}}
+            {{-- =============================== --}}
             {{-- TEMPLATE TIM INTI --}}
-            {{-- ===================================================== --}}
-            <div class="bg-white shadow sm:rounded-lg p-6">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4">Template Tim Inti</h3>
+            {{-- =============================== --}}
+            <div class="bg-white shadow sm:rounded-lg">
+                <div class="p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900">Template Tim Inti</h3>
+                        <div class="text-sm text-gray-500">
+                            {{ $templatesInti->count() }} item
+                        </div>
+                    </div>
 
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-left border-collapse">
-                        <thead class="bg-gray-100 text-gray-700 text-sm uppercase">
-                        <tr>
-                            <th class="px-4 py-3">Judul</th>
-                            <th class="px-4 py-3">Nama File</th>
-                            <th class="px-4 py-3">Uploader</th>
-                            <th class="px-4 py-3">Tanggal</th>
-                            <th class="px-4 py-3 text-center">Aksi</th>
-                        </tr>
-                        </thead>
+                    @if ($templatesInti->isEmpty())
+                        <div class="text-center py-10">
+                            <div class="text-gray-900 font-semibold">Belum ada template inti</div>
+                            <div class="text-sm text-gray-600 mt-1">Klik tombol “Upload Template” untuk menambahkan.</div>
+                        </div>
+                    @else
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50 text-gray-700 text-xs uppercase tracking-wide">
+                                        <th class="px-4 py-3">Template</th>
+                                        <th class="px-4 py-3">Uploader</th>
+                                        <th class="px-4 py-3">Bidang</th>
+                                        <th class="px-4 py-3">Tanggal</th>
+                                        <th class="px-4 py-3 text-center">Aksi</th>
+                                    </tr>
+                                </thead>
 
-                        <tbody class="divide-y">
+                                <tbody id="tplBodyInti" class="divide-y">
+                                    @foreach($templatesInti as $t)
+                                        @php
+                                            $uploaderName = optional($t->uploader)->name ?? '-';
+                                            $shareText = '-';
+                                            if (!$t->bidang_id) {
+                                                $shareText = ($t->bidangs && $t->bidangs->count() > 0)
+                                                    ? $t->bidangs->pluck('nama_bidang')->implode(', ')
+                                                    : 'Private (Tim Inti)';
+                                            }
+                                        @endphp
 
-                        @forelse($templatesInti as $t)
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-3">{{ $t->title }}</td>
-                                <td class="px-4 py-3">{{ $t->original_name }}</td>
-                                <td class="px-4 py-3">{{ optional($t->uploader)->name ?? '-' }}</td>
-                                <td class="px-4 py-3">{{ optional($t->created_at)->format('d-m-Y | H:i') }}</td>
+                                        <tr class="hover:bg-gray-50 tpl-row"
+                                            data-search="{{ strtolower($t->title.' '.$t->original_name.' '.$uploaderName.' tim inti '.$shareText) }}">
+                                            {{-- TEMPLATE --}}
+                                            <td class="px-4 py-3">
+                                                <div class="font-semibold text-gray-900">
+                                                    {{ $t->title }}
+                                                </div>
+                                                <div class="text-xs text-gray-500 mt-1">
+                                                    {{ $t->original_name }}
+                                                </div>
+                                                <div class="text-xs text-gray-600 mt-1">
+                                                    <span class="text-gray-500">Shared:</span> {{ $shareText }}
+                                                </div>
+                                            </td>
 
-                                <td class="px-4 py-3">
-                                    <div class="flex gap-2 justify-center">
+                                            {{-- UPLOADER --}}
+                                            <td class="px-4 py-3">
+                                                <div class="text-sm text-gray-900">{{ $uploaderName }}</div>
+                                            </td>
 
-                                        {{-- Detail --}}
-                                        <a href="{{ route('templates.show', $t) }}"
-                                           class="px-3 py-1 bg-gray-700 text-white rounded text-sm hover:bg-gray-800">
-                                            Detail
-                                        </a>
+                                            {{-- BIDANG --}}
+                                            <td class="px-4 py-3">
+                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
+                                                    Tim Inti
+                                                </span>
+                                            </td>
 
-                                        {{-- Preview otomatis PDF / Google Docs --}}
-                                        @if(strtolower($t->file_type) === 'pdf')
-                                            <a href="{{ route('templates.stream', $t) }}" target="_blank"
-                                               class="px-3 py-1 bg-yellow-500 text-white rounded text-sm hover:bg-yellow-600">
-                                                Preview
-                                            </a>
-                                        @else
-                                            <a href="{{ route('templates.view', $t) }}" target="_blank"
-                                               class="px-3 py-1 bg-yellow-500 text-white rounded text-sm hover:bg-yellow-600">
-                                                Preview
-                                            </a>
-                                        @endif
+                                            {{-- TANGGAL --}}
+                                            <td class="px-4 py-3">
+                                                <div class="text-sm text-gray-900">{{ optional($t->created_at)->format('d-m-Y') }}</div>
+                                                <div class="text-xs text-gray-500">{{ optional($t->created_at)->format('H:i') }}</div>
+                                            </td>
 
-                                        {{-- Download --}}
-                                        <a href="{{ route('templates.download', $t) }}"
-                                           class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
-                                            Download
-                                        </a>
+                                            {{-- AKSI --}}
+                                            <td class="px-4 py-3">
+                                                <div class="flex items-center justify-center gap-2 flex-wrap">
 
-                                        {{-- Delete --}}
-                                        @hasanyrole('super_admin|tim_inti')
-                                            <button type="button"
-                                                    onclick="deleteTemplate({{ $t->id }})"
-                                                    class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700">
-                                                Hapus
-                                            </button>
-                                        @endhasanyrole
-                                    </div>
-                                </td>
-                            </tr>
+                                                    {{-- Preview --}}
+                                                    @if(strtolower($t->file_type) === 'pdf')
+                                                        <a href="{{ route('templates.stream', $t) }}" target="_blank"
+                                                           class="px-3 py-2 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 text-sm">
+                                                            Preview
+                                                        </a>
+                                                    @else
+                                                        <a href="{{ route('templates.view', $t) }}" target="_blank"
+                                                           class="px-3 py-2 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 text-sm">
+                                                            Preview
+                                                        </a>
+                                                    @endif
 
-                        @empty
-                            <tr>
-                                <td colspan="5" class="text-center text-gray-600 py-4">
-                                    Belum ada template inti.
-                                </td>
-                            </tr>
-                        @endforelse
+                                                    {{-- Download --}}
+                                                    <a href="{{ route('templates.download', $t) }}"
+                                                       class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">
+                                                        Download
+                                                    </a>
 
-                        </tbody>
-                    </table>
+                                                    {{-- Add to Folder (Sekretaris) --}}
+                                                    @can('files.manage')
+                                                        @if($folders->isEmpty())
+                                                            <a href="{{ route('folders.index') }}"
+                                                               class="px-3 py-2 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-sm">
+                                                                Buat Folder dulu
+                                                            </a>
+                                                        @else
+                                                            <details class="relative">
+                                                                <summary class="list-none cursor-pointer px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm inline-flex items-center gap-2">
+                                                                    + Folder
+                                                                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                                        <path d="M6 9l6 6 6-6"/>
+                                                                    </svg>
+                                                                </summary>
+
+                                                                <div class="absolute right-0 mt-2 w-64 bg-white border rounded-lg shadow-lg p-3 z-20">
+                                                                    <form method="POST" onsubmit="return submitToFolderTpl(this);">
+                                                                        @csrf
+                                                                        <input type="hidden" name="source" value="template">
+                                                                        <input type="hidden" name="source_id" value="{{ $t->id }}">
+
+                                                                        <label class="text-xs text-gray-600">Pilih folder</label>
+                                                                        <select name="folder_id" class="mt-1 w-full border-gray-300 rounded text-sm">
+                                                                            <option value="">Pilih folder...</option>
+                                                                            @foreach($folders as $f)
+                                                                                <option value="{{ $f->id }}">{{ $f->name }}</option>
+                                                                            @endforeach
+                                                                        </select>
+
+                                                                        <button type="submit"
+                                                                                class="mt-3 w-full px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm">
+                                                                            Simpan ke Folder
+                                                                        </button>
+                                                                    </form>
+                                                                </div>
+                                                            </details>
+                                                        @endif
+                                                    @endcan
+
+                                                    {{-- Delete (inti boleh hapus template inti)
+                                                    @hasanyrole('super_admin|ketua|wakil_ketua|sekretaris|bendahara')
+                                                        <form id="delete-template-{{ $t->id }}"
+                                                              method="POST"
+                                                              action="{{ route('templates.destroy', $t) }}"
+                                                              class="hidden">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                        </form>
+
+                                                        <button type="button"
+                                                                onclick="confirmDeleteTemplate({{ $t->id }})"
+                                                                class="px-3 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm">
+                                                            Hapus
+                                                        </button>
+                                                    @endhasanyrole --}}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
                 </div>
             </div>
 
-
-
-            {{-- ===================================================== --}}
+            {{-- =============================== --}}
             {{-- TEMPLATE BIDANG --}}
-            {{-- ===================================================== --}}
-            <div class="bg-white shadow sm:rounded-lg p-6">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4">Template Bidang</h3>
+            {{-- =============================== --}}
+            <div class="bg-white shadow sm:rounded-lg">
+                <div class="p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900">Template Bidang</h3>
+                        <div class="text-sm text-gray-500">
+                            {{ $templatesBidang->count() }} item
+                        </div>
+                    </div>
 
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-left border-collapse">
-                        <thead class="bg-gray-100 text-gray-700 text-sm uppercase">
-                        <tr>
-                            <th class="px-4 py-3">Judul</th>
-                            <th class="px-4 py-3">Nama File</th>
-                            <th class="px-4 py-3">Bidang</th>
-                            <th class="px-4 py-3">Uploader</th>
-                            <th class="px-4 py-3 text-center">Aksi</th>
-                        </tr>
-                        </thead>
+                    @if ($templatesBidang->isEmpty())
+                        <div class="text-center py-10">
+                            <div class="text-gray-900 font-semibold">Belum ada template bidang</div>
+                            <div class="text-sm text-gray-600 mt-1">Template bidang otomatis muncul sesuai bidang masing-masing.</div>
+                        </div>
+                    @else
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50 text-gray-700 text-xs uppercase tracking-wide">
+                                        <th class="px-4 py-3">Template</th>
+                                        <th class="px-4 py-3">Uploader</th>
+                                        <th class="px-4 py-3">Bidang</th>
+                                        <th class="px-4 py-3">Tanggal</th>
+                                        <th class="px-4 py-3 text-center">Aksi</th>
+                                    </tr>
+                                </thead>
 
-                        <tbody class="divide-y">
+                                <tbody id="tplBodyBidang" class="divide-y">
+                                    @foreach($templatesBidang as $t)
+                                        @php
+                                            $uploaderName = optional($t->uploader)->name ?? '-';
+                                            $bidangName = optional($t->bidang)->nama_bidang ?? '-';
+                                        @endphp
 
-                        @forelse($templatesBidang as $t)
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-3">{{ $t->title }}</td>
-                                <td class="px-4 py-3">{{ $t->original_name }}</td>
-                                <td class="px-4 py-3">{{ optional($t->bidang)->nama_bidang }}</td>
-                                <td class="px-4 py-3">{{ optional($t->uploader)->name }}</td>
+                                        <tr class="hover:bg-gray-50 tpl-row"
+                                            data-search="{{ strtolower($t->title.' '.$t->original_name.' '.$uploaderName.' '.$bidangName) }}">
+                                            {{-- TEMPLATE --}}
+                                            <td class="px-4 py-3">
+                                                <div class="font-semibold text-gray-900">
+                                                    {{ $t->title }}
+                                                </div>
+                                                <div class="text-xs text-gray-500 mt-1">
+                                                    {{ $t->original_name }}
+                                                </div>
+                                            </td>
 
-                                <td class="px-4 py-3">
-                                    <div class="flex gap-2 justify-center">
+                                            {{-- UPLOADER --}}
+                                            <td class="px-4 py-3">
+                                                <div class="text-sm text-gray-900">{{ $uploaderName }}</div>
+                                            </td>
 
-                                        {{-- Detail --}}
-                                        <a href="{{ route('templates.show', $t) }}"
-                                           class="px-3 py-1 bg-gray-700 text-white rounded text-sm hover:bg-gray-800">
-                                            Detail
-                                        </a>
+                                            {{-- BIDANG --}}
+                                            <td class="px-4 py-3">
+                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs
+                                                    {{ $bidangName !== '-' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-700' }}">
+                                                    {{ $bidangName }}
+                                                </span>
+                                            </td>
 
-                                        {{-- Preview --}}
-                                        @if(strtolower($t->file_type) === 'pdf')
-                                            <a href="{{ route('templates.stream', $t) }}" target="_blank"
-                                               class="px-3 py-1 bg-yellow-500 text-white rounded text-sm hover:bg-yellow-600">
-                                                Preview
-                                            </a>
-                                        @else
-                                            <a href="{{ route('templates.view', $t) }}" target="_blank"
-                                               class="px-3 py-1 bg-yellow-500 text-white rounded text-sm hover:bg-yellow-600">
-                                                Preview
-                                            </a>
-                                        @endif
+                                            {{-- TANGGAL --}}
+                                            <td class="px-4 py-3">
+                                                <div class="text-sm text-gray-900">{{ optional($t->created_at)->format('d-m-Y') }}</div>
+                                                <div class="text-xs text-gray-500">{{ optional($t->created_at)->format('H:i') }}</div>
+                                            </td>
 
-                                        {{-- Download --}}
-                                        <a href="{{ route('templates.download', $t) }}"
-                                           class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
-                                            Download
-                                        </a>
+                                            {{-- AKSI --}}
+                                            <td class="px-4 py-3">
+                                                <div class="flex items-center justify-center gap-2 flex-wrap">
+                                                    {{-- Detail --}}
+                                                    <a href="{{ route('templates.show', $t) }}"
+                                                       class="px-3 py-2 rounded-lg bg-gray-800 text-white hover:bg-gray-900 text-sm">
+                                                        Detail
+                                                    </a>
 
-                                        {{-- Delete --}}
-                                        @if(auth()->user()->hasRole('super_admin') ||
-                                            (auth()->user()->hasRole('tim_bidang') && $t->uploaded_by === auth()->id()))
+                                                    {{-- Preview --}}
+                                                    @if(strtolower($t->file_type) === 'pdf')
+                                                        <a href="{{ route('templates.stream', $t) }}" target="_blank"
+                                                           class="px-3 py-2 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 text-sm">
+                                                            Preview
+                                                        </a>
+                                                    @else
+                                                        <a href="{{ route('templates.view', $t) }}" target="_blank"
+                                                           class="px-3 py-2 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 text-sm">
+                                                            Preview
+                                                        </a>
+                                                    @endif
 
-                                            <button type="button"
-                                                    onclick="deleteTemplate({{ $t->id }})"
-                                                    class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700">
-                                                Hapus
-                                            </button>
+                                                    {{-- Download --}}
+                                                    <a href="{{ route('templates.download', $t) }}"
+                                                       class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">
+                                                        Download
+                                                    </a>
 
-                                        @endif
-                                    </div>
-                                </td>
-                            </tr>
+                                                    {{-- Add to Folder (Sekretaris) --}}
+                                                    @can('files.manage')
+                                                        @if($folders->isEmpty())
+                                                            <a href="{{ route('folders.index') }}"
+                                                               class="px-3 py-2 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-sm">
+                                                                Buat Folder dulu
+                                                            </a>
+                                                        @else
+                                                            <details class="relative">
+                                                                <summary class="list-none cursor-pointer px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm inline-flex items-center gap-2">
+                                                                    + Folder
+                                                                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                                        <path d="M6 9l6 6 6-6"/>
+                                                                    </svg>
+                                                                </summary>
 
-                        @empty
-                            <tr>
-                                <td colspan="5" class="text-center text-gray-600 py-4">
-                                    Belum ada template bidang.
-                                </td>
-                            </tr>
-                        @endforelse
+                                                                <div class="absolute right-0 mt-2 w-64 bg-white border rounded-lg shadow-lg p-3 z-20">
+                                                                    <form method="POST" onsubmit="return submitToFolderTpl(this);">
+                                                                        @csrf
+                                                                        <input type="hidden" name="source" value="template">
+                                                                        <input type="hidden" name="source_id" value="{{ $t->id }}">
 
-                        </tbody>
-                    </table>
+                                                                        <label class="text-xs text-gray-600">Pilih folder</label>
+                                                                        <select name="folder_id" class="mt-1 w-full border-gray-300 rounded text-sm">
+                                                                            <option value="">Pilih folder...</option>
+                                                                            @foreach($folders as $f)
+                                                                                <option value="{{ $f->id }}">{{ $f->name }}</option>
+                                                                            @endforeach
+                                                                        </select>
+
+                                                                        <button type="submit"
+                                                                                class="mt-3 w-full px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm">
+                                                                            Simpan ke Folder
+                                                                        </button>
+                                                                    </form>
+                                                                </div>
+                                                            </details>
+                                                        @endif
+                                                    @endcan
+
+                                                    {{-- Delete (super_admin OR pemilik template bidang) --}}
+                                                    @php
+                                                        $user = auth()->user();
+                                                        $canDelete =
+                                                            $user->hasRole('super_admin') ||
+                                                            (
+                                                                $user->hasAnyRole(['ketua_bidang','ketua_sie','anggota_komunitas'])
+                                                                && (int)$t->uploaded_by === (int)$user->id
+                                                            );
+                                                    @endphp
+
+                                                    @if($canDelete)
+                                                        <form id="delete-template-{{ $t->id }}"
+                                                              method="POST"
+                                                              action="{{ route('templates.destroy', $t) }}"
+                                                              class="hidden">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                        </form>
+
+                                                        <button type="button"
+                                                                onclick="confirmDeleteTemplate({{ $t->id }})"
+                                                                class="px-3 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm">
+                                                            Hapus
+                                                        </button>
+                                                    @endif
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
                 </div>
+            </div>
+
+            {{-- no-result --}}
+            <div id="tplNoResult" class="hidden bg-white shadow sm:rounded-lg p-6 text-center">
+                <div class="text-gray-900 font-semibold">Template tidak ditemukan</div>
+                <div class="text-sm text-gray-600 mt-1">Coba kata kunci lain.</div>
             </div>
 
         </div>
     </div>
 
+    {{-- SCRIPTS --}}
+    @once
+        <script>
+            // Search (client-side) untuk 2 tabel sekaligus
+            const tplSearch = document.getElementById('tplSearch');
+            const tplRows = document.querySelectorAll('.tpl-row');
+            const tplNoResult = document.getElementById('tplNoResult');
 
-    {{-- SWEETALERT DELETE --}}
-    <script>
-        function deleteTemplate(id) {
-            Swal.fire({
-                title: 'Hapus Template?',
-                text: "Tindakan ini permanen dan tidak dapat dikembalikan.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Hapus',
-                cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
+            if (tplSearch) {
+                tplSearch.addEventListener('input', () => {
+                    const q = (tplSearch.value || '').toLowerCase().trim();
+                    let visible = 0;
 
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = '/templates/' + id;
-                    form.innerHTML = `
-                        @csrf
-                        @method('DELETE')
-                    `;
-                    document.body.appendChild(form);
-                    form.submit();
+                    tplRows.forEach(row => {
+                        const hay = row.getAttribute('data-search') || '';
+                        const show = hay.includes(q);
+                        row.classList.toggle('hidden', !show);
+                        if (show) visible++;
+                    });
+
+                    if (tplNoResult) tplNoResult.classList.toggle('hidden', visible !== 0);
+                });
+            }
+
+            function submitToFolderTpl(form) {
+                const folderId = form.querySelector('[name="folder_id"]').value;
+                if (!folderId) {
+                    Swal.fire('Pilih folder dulu', '', 'warning');
+                    return false;
                 }
-            });
-        }
-    </script>
+                form.action = `/folders/${folderId}/items`;
+                return true;
+            }
 
+            function confirmDeleteTemplate(id) {
+                Swal.fire({
+                    title: 'Hapus Template?',
+                    text: "Tindakan ini permanen dan tidak dapat dikembalikan.",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#e3342f',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Ya, hapus',
+                    cancelButtonText: 'Batal'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        const form = document.getElementById('delete-template-' + id);
+                        if (form) form.submit();
+                    }
+                });
+            }
+
+            // expose
+            window.submitToFolderTpl = submitToFolderTpl;
+            window.confirmDeleteTemplate = confirmDeleteTemplate;
+        </script>
+    @endonce
 </x-app-layout>

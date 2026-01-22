@@ -51,6 +51,21 @@
                     </div>
 
                     <div>
+                        <dt class="text-sm text-gray-500">Target Kedudukan</dt>
+                        <dd class="text-sm text-gray-900">
+                            @php
+                                $label = [
+                                    'dpp_inti' => 'DPP Inti',
+                                    'lingkungan' => 'Lingkungan',
+                                    'bgkp' => 'BGKP',
+                                    'sekretariat' => 'Sekretariat',
+                                ][$program->target_kedudukan] ?? '-';
+                            @endphp
+                            {{ $label }}
+                        </dd>
+                    </div>
+
+                    <div>
                         <dt class="text-sm text-gray-500">Tanggal Mulai</dt>
                         <dd class="text-sm text-gray-900">
                             {{ $program->tanggal_mulai }}
@@ -109,7 +124,7 @@
                 <div class="flex items-center justify-between">
                     <h3 class="text-lg font-semibold text-gray-900">Daftar Proposal</h3>
 
-                    @can('create', [\App\Models\Proposal::class, $program])
+                    @can('proposal.upload')
                         <a href="{{ route('programs.proposals.create', $program) }}"
                            class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
                             + Upload Proposal
@@ -117,8 +132,18 @@
                     @endcan
                 </div>
 
-                @if ($program->proposals->isEmpty())
-                    <p class="text-sm text-gray-600">Belum ada proposal.</p>
+                @php
+                    $isBendahara = auth()->user()->hasRole('bendahara');
+
+                    $visibleProposals = $isBendahara
+                        ? $program->proposals->where('status', 'diterima')
+                        : $program->proposals;
+                @endphp
+
+                @if ($visibleProposals->isEmpty())
+                    <p class="text-sm text-gray-600">
+                        {{ $isBendahara ? 'Belum ada proposal yang disetujui ketua.' : 'Belum ada proposal.' }}
+                    </p>
                 @else
                     <div class="overflow-x-auto">
                         <table class="min-w-full text-left border-collapse">
@@ -126,13 +151,16 @@
                                 <tr>
                                     <th class="px-4 py-3">Judul</th>
                                     <th class="px-4 py-3">Status</th>
-                                    <th class="px-4 py-3">Stage</th>
+                                    {{-- <th class="px-4 py-3">Stage</th> --}}
+                                    @if (!$isBendahara)
+                                        <th class="px-4 py-3">Stage</th>
+                                    @endif
                                     <th class="px-4 py-3 text-center">Aksi</th>
                                 </tr>
                             </thead>
 
                             <tbody class="divide-y">
-                                @foreach ($program->proposals as $proposal)
+                                @foreach ($visibleProposals as $proposal)
                                     @php
                                         $statusBadge = match ($proposal->status) {
                                             'review' => 'bg-blue-100 text-blue-800',
@@ -153,8 +181,36 @@
                                         <td class="px-4 py-3 font-medium text-gray-900">
                                             {{ $proposal->judul }}
                                             <div class="text-xs text-gray-500">
-                                                {{ $proposal->created_at->format('d M Y H:i') }}
+                                                {{ optional($proposal->created_at)->format('d M Y H:i') ?? '-' }}
                                             </div>
+
+                                            {{-- Lampiran Proposal --}}
+                                            @if($proposal->files->count())
+                                                <div class="mt-2 space-y-1 text-xs">
+                                                    <div class="text-gray-500">Lampiran:</div>
+
+                                                    @foreach($proposal->files as $file)
+                                                        <div class="flex items-center gap-2">
+                                                            <span class="text-gray-700">{{ $file->original_name }}</span>
+
+                                                            @can('viewFile', $proposal)
+                                                                <a target="_blank"
+                                                                href="{{ route('programs.proposals.files.preview', [$program, $proposal, $file]) }}"
+                                                                class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">
+                                                                    Preview
+                                                                </a>
+                                                            @endcan
+
+                                                            @can('downloadFile', $proposal)
+                                                                <a href="{{ route('programs.proposals.files.download', [$program, $proposal, $file]) }}"
+                                                                class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">
+                                                                    Download
+                                                                </a>
+                                                            @endcan
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            @endif
                                         </td>
 
                                         <td class="px-4 py-3">
@@ -163,16 +219,22 @@
                                             </span>
                                         </td>
 
-                                        <td class="px-4 py-3 text-sm text-gray-700">
+                                        @if (!$isBendahara)
+                                            <td class="px-4 py-3 text-sm text-gray-700">
+                                                {{ $stageLabel }}
+                                            </td>
+                                        @endif
+
+                                        {{-- <td class="px-4 py-3 text-sm text-gray-700">
                                             {{ $stageLabel }}
-                                        </td>
+                                        </td> --}}
 
                                         <td class="px-4 py-3">
                                             {{-- bikin aksi jadi 2 baris supaya rapi --}}
                                             <div class="flex flex-col items-center gap-2">
 
                                                 {{-- Row tombol --}}
-                                                <div class="flex gap-2 justify-center">
+                                                @if($proposal->status === 'review')
                                                     @can('approve', $proposal)
                                                         <form method="POST" action="{{ route('programs.proposals.approve', [$program, $proposal]) }}">
                                                             @csrf
@@ -182,31 +244,32 @@
                                                             </button>
                                                         </form>
                                                     @endcan
-                                                </div>
 
-                                                {{-- Reject inline (opsi A) --}}
-                                                @can('reject', $proposal)
-                                                    <details class="w-full">
-                                                        <summary class="text-xs text-red-700 cursor-pointer select-none text-center">
-                                                            Reject (isi alasan)
-                                                        </summary>
+                                                    {{-- Reject inline (opsi A) --}}
+                                                    @can('reject', $proposal)
+                                                        <details class="w-full">
+                                                            <summary class="text-xs text-red-700 cursor-pointer select-none text-center">
+                                                                Reject (isi alasan)
+                                                            </summary>
 
-                                                        <form method="POST"
-                                                              action="{{ route('programs.proposals.reject', [$program, $proposal]) }}"
-                                                              class="mt-2 space-y-2">
-                                                            @csrf
-                                                            @method('PATCH')
+                                                            <form method="POST"
+                                                                action="{{ route('programs.proposals.reject', [$program, $proposal]) }}"
+                                                                class="mt-2 space-y-2">
+                                                                @csrf
+                                                                @method('PATCH')
 
-                                                            <textarea name="reject_reason" rows="3"
-                                                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                                                placeholder="Tuliskan alasan penolakan..." required></textarea>
+                                                                <textarea name="reject_reason" rows="3"
+                                                                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                                                    placeholder="Tuliskan alasan penolakan..." required></textarea>
 
-                                                            <button class="w-full px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700">
-                                                                Submit Reject
-                                                            </button>
-                                                        </form>
-                                                    </details>
-                                                @endcan
+                                                                <button class="w-full px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700">
+                                                                    Submit Reject
+                                                                </button>
+                                                            </form>
+                                                        </details>
+                                                    @endcan
+                                                @endif
+                                                {{-- End --}}
 
                                                 @if ($proposal->status === 'ditolak' && $proposal->reject_reason)
                                                     <div class="w-full text-xs text-red-700 bg-red-50 rounded p-2">

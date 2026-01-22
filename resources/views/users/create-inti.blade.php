@@ -101,8 +101,12 @@
                             <option value="bendahara_1" data-kedudukan="dpp_inti,bgkp" {{ old('jabatan')==='bendahara_1'?'selected':'' }}>Bendahara 1</option>
                             <option value="bendahara_2" data-kedudukan="dpp_inti,bgkp" {{ old('jabatan')==='bendahara_2'?'selected':'' }}>Bendahara 2</option>
 
-                            {{-- KHUSUS DPP Inti --}}
-                            <option value="ketua_bidang" data-kedudukan="dpp_inti" {{ old('jabatan')==='ketua_bidang'?'selected':'' }}>Ketua Bidang</option>
+                            {{-- Ketua Bidang: DPP Inti + BGKP + Lingkungan --}}
+                            <option value="ketua_bidang" data-kedudukan="dpp_inti,bgkp,lingkungan" {{ old('jabatan')==='ketua_bidang'?'selected':'' }}>
+                                Ketua Bidang
+                            </option>
+
+                            {{-- Ketua Sie: khusus DPP Inti --}}
                             <option value="ketua_sie" data-kedudukan="dpp_inti" {{ old('jabatan')==='ketua_sie'?'selected':'' }}>Ketua Sie</option>
 
                             {{-- Lingkungan --}}
@@ -118,7 +122,6 @@
                     </div>
 
                     {{-- BIDANG --}}
-                    {{-- BIDANG --}}
                     <div id="wrapBidang" class="hidden">
                         <x-input-label for="bidang_id" value="Bidang" />
                         <select
@@ -128,7 +131,11 @@
                         >
                             <option value="">-- Pilih Bidang --</option>
                             @foreach($bidangs as $b)
-                                <option value="{{ $b->id }}" {{ (string)old('bidang_id')===(string)$b->id ? 'selected':'' }}>
+                                <option
+                                    value="{{ $b->id }}"
+                                    data-kedudukan="{{ $b->kedudukan }}"
+                                    {{ (string)old('bidang_id')===(string)$b->id ? 'selected':'' }}
+                                >
                                     {{ $b->nama_bidang }}
                                 </option>
                             @endforeach
@@ -146,16 +153,17 @@
                         >
                             <option value="">-- Pilih Sie --</option>
                             @foreach($sies as $s)
-                                <option value="{{ $s->id }}"
+                                <option
+                                    value="{{ $s->id }}"
                                     data-bidang="{{ $s->bidang_id }}"
-                                    {{ (string)old('sie_id')===(string)$s->id ? 'selected':'' }}>
+                                    {{ (string)old('sie_id')===(string)$s->id ? 'selected':'' }}
+                                >
                                     {{ $s->nama_sie }}
                                 </option>
                             @endforeach
                         </select>
                         <x-input-error :messages="$errors->get('sie_id')" class="mt-2" />
                     </div>
-                    {{-- END --}}
 
                     {{-- PASSWORD --}}
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -215,7 +223,7 @@
             const k = kedudukan.value;
 
             [...jabatan.options].forEach(opt => {
-                if (!opt.value) return; // skip placeholder
+                if (!opt.value) return;
                 const allowed = (opt.dataset.kedudukan || '').split(',').map(s => s.trim());
                 const show = allowed.includes(k);
 
@@ -223,11 +231,36 @@
                 opt.disabled = !show;
             });
 
-            // kalau jabatan yg kepilih jadi tidak valid, reset
             const selected = jabatan.options[jabatan.selectedIndex];
-            if (selected && selected.disabled) {
-                jabatan.value = '';
-            }
+            if (selected && selected.disabled) jabatan.value = '';
+        }
+
+        function filterBidangByKedudukan() {
+            const k = kedudukan.value;
+
+            [...bidang.options].forEach(opt => {
+                if (!opt.value) return;
+                const show = opt.dataset.kedudukan === k;
+                opt.hidden = !show;
+                opt.disabled = !show;
+            });
+
+            const selected = bidang.options[bidang.selectedIndex];
+            if (selected && selected.disabled) bidang.value = '';
+        }
+
+        function filterSieByBidang() {
+            const bidangId = bidang.value;
+
+            [...sie.options].forEach(opt => {
+                if (!opt.value) return;
+                const match = opt.dataset.bidang === bidangId;
+                opt.hidden = !match;
+                opt.disabled = !match;
+            });
+
+            const selected = sie.options[sie.selectedIndex];
+            if (selected && selected.disabled) sie.value = '';
         }
 
         function toggleBidangSie() {
@@ -239,28 +272,15 @@
             wrapBidang.classList.toggle('hidden', !needsBidang);
             wrapSie.classList.toggle('hidden', !needsSie);
 
-            if (!needsBidang) {
+            if (needsBidang) {
+                filterBidangByKedudukan();
+            } else {
                 bidang.value = '';
             }
-            if (!needsSie) {
-                sie.value = '';
-            }
 
-            filterSieByBidang(); // biar sync
-        }
-
-        function filterSieByBidang() {
-            const bidangId = bidang.value;
-
-            [...sie.options].forEach(opt => {
-                if (!opt.value) return; // placeholder
-                const match = opt.dataset.bidang === bidangId;
-                opt.hidden = !match;
-                opt.disabled = !match;
-            });
-
-            const selected = sie.options[sie.selectedIndex];
-            if (selected && selected.disabled) {
+            if (needsSie) {
+                filterSieByBidang();
+            } else {
                 sie.value = '';
             }
         }

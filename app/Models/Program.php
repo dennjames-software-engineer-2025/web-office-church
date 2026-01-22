@@ -17,6 +17,7 @@ class Program extends Model
         'tanggal_selesai',
         'bidang_id',
         'created_by',
+        'target_kedudukan',
     ];
 
     public function proposals()

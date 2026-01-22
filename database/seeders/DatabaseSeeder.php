@@ -4,6 +4,9 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Database\Seeders\BidangSieSeeder;
+use Database\Seeders\SuperAdminSeeder;
+use Database\Seeders\DemoAccountsSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 
@@ -27,6 +30,7 @@ class DatabaseSeeder extends Seeder
             RolePermissionSeeder::class,
             BidangSieSeeder::class,
             SuperAdminSeeder::class,
+            DemoAccountsSeeder::class,
         ]);
     }
 }

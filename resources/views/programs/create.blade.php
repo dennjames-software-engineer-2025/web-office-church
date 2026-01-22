@@ -46,6 +46,21 @@
                             <x-input-error :messages="$errors->get('deskripsi')" class="mt-2" />
                         </div>
 
+                        {{-- Target Kedudukan --}}
+                        <div class="mt-4">
+                            <x-input-label for="target_kedudukan" value="Target Kedudukan (Penanggung Jawab)" />
+                            <select id="target_kedudukan" name="target_kedudukan"
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+                                required>
+                                <option value="dpp_inti" @selected(old('target_kedudukan', 'dpp_inti')==='dpp_inti')>DPP Inti</option>
+                                <option value="lingkungan" @selected(old('target_kedudukan')==='lingkungan')>Lingkungan</option>
+                                <option value="bgkp" @selected(old('target_kedudukan')==='bgkp')>BGKP</option>
+                                <option value="sekretariat" @selected(old('target_kedudukan')==='sekretariat')>Sekretariat</option>
+                            </select>
+                            <x-input-error :messages="$errors->get('target_kedudukan')" class="mt-2" />
+                        </div>
+                        {{-- End --}}
+
                         {{-- Tanggal --}}
                         <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>

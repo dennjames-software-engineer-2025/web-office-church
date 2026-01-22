@@ -15,7 +15,7 @@ class RolePermissionSeeder extends Seeder
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         // =========================
-        // Permissions (ringkas tapi lengkap untuk alur Program/Proposal baru)
+        // Permissions
         // =========================
         $permissions = [
             // Users & Masterdata
@@ -27,20 +27,35 @@ class RolePermissionSeeder extends Seeder
             'program.view',
             'program.update_pending',
             'program.delete_pending',
-            'program.approve',          // ketua / wakil ketua (sesuai target kedudukan via policy)
-            'program.status.update',    // ubah status setelah approve
+            'program.approve',
+            'program.status.update',
 
             // Proposal
-            'proposal.upload',          // upload berkali-kali
-            'proposal.delete_rejected', // opsi B: boleh delete saat review/ditolak (nanti di policy)
-            'proposal.approve',         // ketua / wakil ketua (sesuai target kedudukan via policy)
-            'proposal.view_approved',   // bendahara view-only setelah approved
+            'proposal.upload',
+            'proposal.delete_rejected',
+            'proposal.approve',
+            'proposal.view_approved',
 
             // Notulensi & Files
             'notulensi.manage',
             'notulensi.view',
             'files.manage',
             'files.view',
+
+            // CRUD Bidang & Sie
+            'bidang.manage',
+            'sie.manage',
+
+            // Documents
+            'documents.view',
+            'documents.create',
+            'documents.delete',
+
+            // Announcement / Pengumuman
+            'announcements.view',
+            'announcements.create',
+            'announcements.update',
+            'announcements.delete',
         ];
 
         foreach ($permissions as $name) {
@@ -61,6 +76,7 @@ class RolePermissionSeeder extends Seeder
             'ketua_lingkungan',
             'wakil_ketua_lingkungan',
             'anggota_komunitas',
+            'sekretariat', // ✅ TAMBAH INI
         ];
 
         foreach ($roles as $name) {
@@ -81,6 +97,10 @@ class RolePermissionSeeder extends Seeder
             'proposal.view_approved',
             'files.view',
             'notulensi.view',
+            'documents.view',
+            'documents.create',
+            'documents.delete',
+            'announcements.view',
         ]);
 
         Role::findByName('wakil_ketua', 'web')->syncPermissions([
@@ -91,6 +111,10 @@ class RolePermissionSeeder extends Seeder
             'proposal.view_approved',
             'files.view',
             'notulensi.view',
+            'documents.view',
+            'documents.create',
+            'documents.delete',
+            'announcements.view',
         ]);
 
         Role::findByName('sekretaris', 'web')->syncPermissions([
@@ -99,13 +123,24 @@ class RolePermissionSeeder extends Seeder
             'files.view',
             'notulensi.manage',
             'notulensi.view',
+            'documents.view',
+            'documents.create',
+            'documents.delete',
+            'announcements.view',
+            'announcements.create',
+            'announcements.update',
+            'announcements.delete'
         ]);
 
         Role::findByName('bendahara', 'web')->syncPermissions([
             'program.view',
-            'proposal.view_approved', // view-only untuk pencatatan
+            'proposal.view_approved',
             'files.view',
             'notulensi.view',
+            'documents.view',
+            'documents.create',
+            'documents.delete',
+            'announcements.view',
         ]);
 
         Role::findByName('ketua_bidang', 'web')->syncPermissions([
@@ -117,6 +152,10 @@ class RolePermissionSeeder extends Seeder
             'proposal.delete_rejected',
             'files.view',
             'notulensi.view',
+            'documents.view',
+            'documents.create',
+            'documents.delete',
+            'announcements.view',
         ]);
 
         Role::findByName('ketua_sie', 'web')->syncPermissions([
@@ -128,20 +167,30 @@ class RolePermissionSeeder extends Seeder
             'proposal.delete_rejected',
             'files.view',
             'notulensi.view',
+            'documents.view',
+            'documents.create',
+            'documents.delete',
+            'announcements.view',
         ]);
 
         Role::findByName('ketua_lingkungan', 'web')->syncPermissions([
             'program.view',
             'files.view',
             'notulensi.view',
-            // Ketua Lingkungan tidak approve (sesuai brief: larinya ke Ketua/Wakil Ketua DPP Inti)
+            'documents.view',
+            'documents.create',
+            'documents.delete',
+            'announcements.view',
         ]);
 
         Role::findByName('wakil_ketua_lingkungan', 'web')->syncPermissions([
             'program.view',
             'files.view',
             'notulensi.view',
-            // Ketua Lingkungan tidak approve (sesuai brief: larinya ke Ketua/Wakil Ketua DPP Inti)
+            'documents.view',
+            'documents.create',
+            'documents.delete',
+            'announcements.view',
         ]);
 
         Role::findByName('anggota_komunitas', 'web')->syncPermissions([
@@ -151,6 +200,19 @@ class RolePermissionSeeder extends Seeder
             'proposal.delete_rejected',
             'files.view',
             'notulensi.view',
+            'documents.view',
+            'documents.create',
+            'documents.delete',
+            'announcements.view',
+        ]);
+
+        // ✅ Role Sekretariat (sementara view-only agar aman)
+        Role::findByName('sekretariat', 'web')->syncPermissions([
+            'program.view',
+            'files.view',
+            'notulensi.view',
+            'documents.view',
+            'announcements.view',
         ]);
     }
 }

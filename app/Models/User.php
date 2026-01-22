@@ -94,4 +94,21 @@ class User extends Authenticatable
 
         return $map[$this->jabatan] ?? Str::title(str_replace('_', ' ', $this->jabatan));
     }
+
+    public function canManageMinutes(): bool
+    {
+        if ($this->hasRole('super_admin')) return true;
+
+        $isSekretaris = $this->hasRole('sekretaris');
+
+        $jabatan = strtolower($this->jabatan ?? '');
+        $isSek1or2 = str_contains($jabatan, 'sekretaris 1') || str_contains($jabatan, 'sekretaris 2');
+
+        return $isSekretaris && $isSek1or2;
+    }
+
+    public function canManageAnnouncements(): bool
+    {
+        return $this->hasRole('sekretaris') || $this->hasRole('super_admin');
+    }
 }

@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Bidang;
+use App\Models\Folder;
 use App\Models\Document;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File;
 
 class DocumentController extends Controller
 {
@@ -15,118 +18,168 @@ class DocumentController extends Controller
     {
         $user = Auth::user();
 
-        if ($user->hasRole('super_admin') || $user->hasRole('tim_inti')) {
-            $documents = Document::latest()->get();
-        } else {
-            // diasumsikan role lain = tim_bidang
-            $documents = Document::where('bidang_id', $user->bidang_id)
-                ->latest()
-                ->get();
-        }
+        $isInti = $user->hasAnyRole(['super_admin','ketua','wakil_ketua','sekretaris','bendahara']);
+        $bidangs = Bidang::orderBy('nama_bidang')->get();
 
-        return view('documents.index', compact('documents'));
+        $documents = Document::with(['user','bidang','sie','sharedBidangs'])
+            ->when(! $isInti, function ($q) use ($user) {
+                $q->where(function ($qq) use ($user) {
+                    $qq->where('bidang_id', $user->bidang_id)
+                        ->orWhere(function ($q2) use ($user) {
+                            $q2->whereNull('bidang_id')
+                                ->whereHas('sharedBidangs', function ($b) use ($user) {
+                                    $b->where('bidangs.id', $user->bidang_id);
+                                });
+                        });
+                });
+            })
+            ->latest()
+            ->get();
+
+        $folders = Auth::user()->can('files.manage')
+            ? Folder::where('created_by', Auth::id())->orderBy('name')->get()
+            : collect();
+
+        return view('documents.index', compact('documents','bidangs','isInti','folders'));
     }
 
     public function create(): View
     {
-        return view('documents.create');
+        $user = Auth::user();
+        $isInti = $user->hasAnyRole(['super_admin','ketua','wakil_ketua','sekretaris','bendahara']);
+        $bidangs = Bidang::orderBy('nama_bidang')->get();
+
+        return view('documents.create', compact('isInti','bidangs'));
     }
 
     public function store(Request $request): RedirectResponse
     {
         $user = Auth::user();
 
-        $request->validate([
-            'title'       => 'required|string|max:255',
-            'file'        => 'required|file|max:10240', // max 10MB contoh
-            'description' => 'nullable|string',
+        $isInti = $user->hasAnyRole(['super_admin','ketua','wakil_ketua','sekretaris','bendahara']);
+        $isNonInti = $user->hasAnyRole(['ketua_bidang','ketua_sie','anggota_komunitas','ketua_lingkungan','wakil_ketua_lingkungan']);
+
+        $validated = $request->validate([
+            'title'       => ['required','string','max:255'],
+            'file'        => ['required','file','max:10240','mimes:pdf,doc,docx,xls,xlsx,ppt,pptx'],
+            'description' => ['nullable','string'],
+            'share_bidangs' => ['nullable','array'],
+            'share_bidangs.*' => ['integer','exists:bidangs,id'],
         ]);
 
-        $uploadedFile = $request->file('file');
+        $file = $request->file('file');
+        $path = $file->store('documents', 'public');
 
-        // Simpan file ke storage/app/documents
-        $path = $uploadedFile->store('documents');
-
-        // Tentukan bidang_id dokumen sesuai role
         $bidangId = null;
-        $sieId    = null;
+        $sieId = null;
 
-        if ($user->hasRole('tim_bidang')) {
-            $bidangId   = $user->bidang_id;
-            $sieId      = $user->sie_id;
-        } elseif ($user->hasRole('tim_inti') || $user->hasRole('super_admin')) {
+        if ($isNonInti) {
+            $bidangId = $user->bidang_id;
+            $sieId    = $user->sie_id;
+        } elseif ($isInti) {
             $bidangId = null;
             $sieId = null;
         } else {
             abort(403, 'Anda tidak memiliki akses upload dokumen');
         }
 
-        Document::create([
-            'user_id'    => $user->id,
-            'bidang_id'  => $bidangId,
-            'sie_id'     => $sieId,
-            'title'      => $request->title,
-            'filename'   => $uploadedFile->getClientOriginalName(),
-            'path'       => $path,
-            'file_type'  => $uploadedFile->getClientMimeType(),
-            'description'=> $request->description,
+        $doc = Document::create([
+            'user_id'     => $user->id,
+            'bidang_id'   => $bidangId,
+            'sie_id'      => $sieId,
+            'title'       => $validated['title'],
+            'filename'    => $file->getClientOriginalName(),
+            'path'        => $path,
+            'file_type'   => $file->getClientMimeType(),
+            'description' => $validated['description'] ?? null,
         ]);
+
+        if ($isInti) {
+            $doc->sharedBidangs()->sync($request->input('share_bidangs', []));
+        }
 
         return redirect()->route('documents.index')->with('status', 'Dokumen berhasil diunggah.');
     }
 
-    public function download(Document $document)
+    /**
+     * ✅ PREVIEW: inline (konsisten dengan Template/ProposalFile)
+     */
+    public function preview(Document $document)
     {
-        $user = Auth::user();
+        $this->ensureCanAccess($document);
 
-        // Authorization sederhana: siapa boleh download apa
-        if ($user->hasRole('super_admin') || $user->hasRole('tim_inti')) {
-            // boleh download semua dokumen
-        } elseif ($user->hasRole('tim_bidang')) {
-            // tim bidang hanya boleh download dokumen bidang sendiri
-            if ($document->bidang_id !== $user->bidang_id) {
-                abort(403, 'Anda tidak memiliki akses ke dokumen ini.');
-            }
-        } else {
-            abort(403, 'Anda tidak memiliki akses ke dokumen ini.');
-        }
+        $disk = Storage::disk('public');
+        abort_unless($document->path && $disk->exists($document->path), 404, 'File tidak ditemukan.');
 
-        if (! Storage::exists($document->path)) {
-            abort(404, 'File tidak ditemukan.');
-        }
+        $absolutePath = $disk->path($document->path);
 
-        return Storage::download($document->path, $document->filename);
+        // FIX: jangan pakai $disk->mimeType() (bisa error pada beberapa driver)
+        $mime = $document->file_type ?: (File::exists($absolutePath) ? (File::mimeType($absolutePath) ?: 'application/octet-stream') : 'application/octet-stream');
+        $name = $document->filename ?: ($document->title ? ($document->title) : 'document');
+
+        return response()->file($absolutePath, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'inline; filename="'.$name.'"',
+        ]);
     }
 
-    public function destroy(Document $document)
+    public function download(Document $document)
+    {
+        $this->ensureCanAccess($document);
+
+        $disk = Storage::disk('public');
+        abort_unless($disk->exists($document->path), 404, 'File tidak ditemukan.');
+
+        return response()->download(
+            $disk->path($document->path),
+            $document->filename,
+            ['Content-Type' => $document->file_type ?? 'application/octet-stream']
+        );
+    }
+
+    public function destroy(Document $document): RedirectResponse
     {
         $user = Auth::user();
+        $isInti = $user->hasAnyRole(['super_admin','ketua','wakil_ketua','sekretaris','bendahara']);
+        $isNonInti = $user->hasAnyRole(['ketua_bidang','ketua_sie','anggota_komunitas','ketua_lingkungan','wakil_ketua_lingkungan']);
 
-        // Authorization
         if ($user->hasRole('super_admin')) {
-            // Super Admin bisa menghapus semua
-        } elseif ($user->hasRole('tim_inti')) {
-            // Tim Inti hanya boleh menghapus dokumen inti (bidang_id null)
-            if (!is_null($document->bidang_id)) {
-                abort(403, 'Anda tidak boleh menghapus dokumen bidang');
-            }
-        } elseif ($user->hasRole('tim_bidang')) {
-            // Tim Bidang hanya boleh menghapus dokumen bidang sendiri
-            if ($document->bidang_id !== $user->bidang_id) {
-                abort(403, 'Anda tidak boleh menghapus dokumen bidang lain.');
-            }
+            // allowed
+        } elseif ($isInti) {
+            abort_unless(is_null($document->bidang_id) && $document->user_id === $user->id, 403);
+        } elseif ($isNonInti) {
+            abort_unless($document->bidang_id === $user->bidang_id && $document->user_id === $user->id, 403);
         } else {
             abort(403);
         }
 
-        // Menghapus file fisik
-        if (Storage::exists($document->path)) {
-            Storage::delete($document->path);
+        $disk = Storage::disk('public');
+        if ($disk->exists($document->path)) {
+            $disk->delete($document->path);
         }
 
-        // Menghapus record DB agar tidak membekas
         $document->delete();
 
         return redirect()->route('documents.index')->with('status', 'Dokumen berhasil dihapus');
+    }
+
+    /**
+     * Helper: aturan akses dokumen (inti / non-inti)
+     */
+    private function ensureCanAccess(Document $document): void
+    {
+        $user = Auth::user();
+        $isInti = $user->hasAnyRole(['super_admin','ketua','wakil_ketua','sekretaris','bendahara']);
+
+        if ($isInti) return;
+
+        $allowed =
+            ($document->bidang_id === $user->bidang_id)
+            || (
+                is_null($document->bidang_id)
+                && $document->sharedBidangs()->where('bidang_id', $user->bidang_id)->exists()
+            );
+
+        abort_unless($allowed, 403);
     }
 }

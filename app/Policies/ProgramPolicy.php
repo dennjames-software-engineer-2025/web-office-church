@@ -16,44 +16,51 @@ class ProgramPolicy
 
     public function viewAny(User $user): bool
     {
-        if ($user->hasAnyRole(['super_admin', 'tim_inti'])) {
-            return true;
-        }
-
-        return $user->hasRole('tim_bidang') && $user->bidang_id !== null;
+        return $user->hasAnyRole([
+            'super_admin',
+            'ketua',
+            'wakil_ketua',
+            'sekretaris',
+            'bendahara',
+            'ketua_bidang',
+            'ketua_sie',
+            'anggota_komunitas',
+        ]);
     }
 
     public function view(User $user, Program $program): bool
     {
-        // super_admin & tim_inti boleh lihat semua
-        if ($user->hasAnyRole(['super_admin', 'tim_inti'])) {
-            return true;
+        if ($user->hasRole('super_admin')) return true;
+
+        if ($user->hasAnyRole(['ketua','wakil_ketua','sekretaris','bendahara'])) {
+            return $user->kedudukan !== null
+                && $program->target_kedudukan === $user->kedudukan;
         }
 
-        // tim_bidang hanya boleh lihat program dalam bidang yang sama
-        return $user->hasRole('tim_bidang')
-            && $user->bidang_id !== null
-            && $program->bidang_id === $user->bidang_id;
+        // pembuat program: hanya program di bidangnya (kalau program punya bidang_id)
+        if ($user->hasAnyRole(['ketua_bidang','ketua_sie','anggota_komunitas'])) {
+            if ($program->bidang_id === null) return true; // kalau nanti program non-bidang
+            return $user->bidang_id !== null && $program->bidang_id === $user->bidang_id;
+        }
+
+        return false;
     }
 
     public function create(User $user): bool
     {
-        // sesuai requirement: hanya tim_bidang yang membuat program
-        return $user->hasRole('tim_bidang');
+        return $user->hasAnyRole(['ketua_bidang', 'ketua_sie', 'anggota_komunitas']);
     }
 
     public function update(User $user, Program $program): bool
     {
-        // Rule opsi A: hanya creator boleh edit, hanya saat draft
-        return $user->hasRole('tim_bidang')
+        return $user->hasAnyRole(['ketua_bidang', 'ketua_sie', 'anggota_komunitas'])
             && $program->status === 'draft'
             && $program->created_by === $user->id;
     }
 
     public function delete(User $user, Program $program): bool
     {
-        // hanya creator, hanya draft, dan hanya jika belum ada proposal
-        return $user->hasRole('tim_bidang')
+        return $user->hasAnyRole(['ketua_bidang', 'ketua_sie', 'anggota_komunitas'])
             && $program->status === 'draft'
             && $program->created_by === $user->id
             && ! $program->proposals()->exists();
@@ -61,11 +68,12 @@ class ProgramPolicy
 
     public function changeStatus(User $user, Program $program): bool
     {
-        if ($user->hasRole('super_admin')) {
-            return true;
-        }
+        if ($user->hasRole('super_admin')) return true;
 
-        // ketua tim_inti boleh ubah status program
-        return $user->hasRole('tim_inti') && $this->jabatanKey($user) === 'ketua';
+        // hanya ketua/wakil yang sesuai dengan target kedudukan program
+        if (! $user->hasAnyRole(['ketua', 'wakil_ketua'])) return false;
+
+        return $user->kedudukan !== null
+            && $program->target_kedudukan === $user->kedudukan;
     }
 }

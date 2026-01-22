@@ -11,9 +11,11 @@ class SieController extends Controller
 {
     public function index(Bidang $bidang)
     {
-        // list sie untuk bidang ini (aktif dan nonaktif)
-        $sies = $bidang->sies()->orderBy('nama_sie')->get();
+        if ($bidang->kedudukan !== 'dpp_inti') {
+            abort(404);
+        }
 
+        $sies = $bidang->sies()->orderBy('nama_sie')->get();
         return view('sies.index', compact('bidang', 'sies'));
     }
 
@@ -28,6 +30,10 @@ class SieController extends Controller
 
     public function store(Request $request, Bidang $bidang)
     {
+        if ($bidang->kedudukan !== 'dpp_inti') {
+            abort(404);
+        }
+
         $validated = $request->validate([
             'nama_sie' => [
                 'required',

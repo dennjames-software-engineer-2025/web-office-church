@@ -2,121 +2,158 @@
 
 namespace App\Policies;
 
-use App\Models\Program;
 use App\Models\Proposal;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class ProposalPolicy
 {
-    private function jabatanKey(User $user): string
+    /**
+     * Sekretaris yang dianggap "Sekretaris 1/2"
+     */
+    private function isSekretaris12(User $user): bool
     {
+        if (! $user) return false;
+        if (! $user->hasRole('sekretaris')) return false;
+
         $jabatan = strtolower(trim($user->jabatan ?? ''));
-        return str_replace([' ', '-'], '_', $jabatan);
+        $jabatan = str_replace([' ', '-'], '_', $jabatan);
+
+        return in_array($jabatan, ['sekretaris_1', 'sekretaris_2'], true);
     }
 
     /**
-     * Determine whether the user can view any models.
+     * Romo = Ketua DPP Inti (kedudukan dpp_inti + role ketua)
      */
-    public function viewAny(User $user): bool
+    private function isRomo(User $user): bool
     {
-        return false;
+        return $user->hasRole('ketua') && $user->kedudukan === 'dpp_inti';
     }
 
     /**
-     * Determine whether the user can view the model.
+     * Anggota DPP Inti (yang ikut DPP Harian dari sisi DPP inti)
      */
+    private function isDppIntiMember(User $user): bool
+    {
+        return $user->kedudukan === 'dpp_inti'
+            && $user->hasAnyRole(['ketua','wakil_ketua','sekretaris','bendahara']);
+    }
+
+    public function create(User $user): bool
+    {
+        return $user->hasRole('ketua_sie') || $user->hasRole('super_admin');
+    }
+
     public function view(User $user, Proposal $proposal): bool
     {
+        if ($user->hasRole('super_admin')) return true;
+
+        // pengaju selalu boleh lihat
+        if ($proposal->created_by === $user->id) return true;
+
+        // ketua bidang: lintas bidang setelah dpp_harian
+        if ($user->hasRole('ketua_bidang')) {
+            if (in_array($proposal->stage, ['dpp_harian', 'romo', 'bendahara'], true) || $proposal->status === 'approved') {
+                return true;
+            }
+            return $user->bidang_id && $proposal->bidang_id === $user->bidang_id;
+        }
+
+        // DPP inti boleh lihat setelah masuk DPP Harian ke atas
+        if ($this->isDppIntiMember($user)) {
+            return in_array($proposal->stage, ['dpp_harian', 'romo', 'bendahara'], true)
+                || in_array($proposal->status, ['menunggu_romo','approved'], true);
+        }
+
+        // bendahara hanya setelah approved
+        if ($user->hasRole('bendahara')) {
+            return $proposal->status === 'approved' || $proposal->stage === 'bendahara';
+        }
+
         return false;
     }
 
-    /**
-     * Determine whether the user can create models.
-     */
-    public function create(User $user, Program $program): bool
+    public function approveKetuaBidang(User $user, Proposal $proposal): bool
     {
-        return $user->hasRole('tim_bidang')
-        && $user->bidang_id !== null
-        && $program->status !== 'selesai'
-        && $program->bidang_id === $user->bidang_id;
+        if ($user->hasRole('super_admin')) return true;
+
+        return $user->hasRole('ketua_bidang')
+            && $user->bidang_id !== null
+            && $proposal->bidang_id === $user->bidang_id
+            && $proposal->status === 'menunggu_ketua_bidang'
+            && $proposal->stage === 'ketua_bidang';
+    }
+
+    public function setDppDeadline(User $user, Proposal $proposal): bool
+    {
+        if ($user->hasRole('super_admin')) return true;
+
+        // sesuai requirement: Romo + Sekretaris 1/2
+        return $this->isSekretaris12($user) || $this->isRomo($user);
     }
 
     /**
-     * Determine whether the user can update the model.
+     * NOTES hanya Sekretaris 1/2 (sementara).
      */
-    public function update(User $user, Proposal $proposal): bool
+    public function addNotes(User $user, Proposal $proposal): bool
     {
-        if (! $user->hasRole('tim_bidang')) return false;
+        if ($user->hasRole('super_admin')) return true;
 
-        // hanya pemilik proposal
-        $isOwner = ($proposal->user_id === $user->id);
+        $isSek12 = $this->isSekretaris12($user);
+        $stageOk  = in_array($proposal->stage, ['dpp_harian', 'romo'], true);
+        $statusOk = in_array($proposal->status, ['dpp_harian', 'menunggu_romo'], true);
 
-        // masih dalam bidang yang sama
-        $sameBidang = ($proposal->program?->bidang_id === $user->bidang_id);
-
-        // program belum selesai (status program kamu lowercase: "selesai")
-        $programNotClosed = ($proposal->program?->status !== 'selesai');
-
-        // Opsi B: boleh edit saat "review" dan "ditolak"
-        $statusOk = in_array($proposal->status, ['review', 'ditolak'], true);
-
-        return $isOwner && $sameBidang && $programNotClosed && $statusOk;
+        return $isSek12 && $stageOk && $statusOk;
     }
 
+    public function approveRomo(User $user, Proposal $proposal): bool
+    {
+        if ($user->hasRole('super_admin')) return true;
+
+        return $this->isRomo($user)
+            && $proposal->stage === 'romo'
+            && $proposal->status === 'menunggu_romo';
+    }
+
+    public function rejectRomo(User $user, Proposal $proposal): bool
+    {
+        return $this->approveRomo($user, $proposal);
+    }
 
     /**
-     * Determine whether the user can delete the model.
+     * ✅ DELETE (versi requirement terbaru):
+     * - Romo / Sekretaris 1/2 / super_admin: boleh hapus kapan saja
+     * - Ketua Sie (pengaju): boleh hapus hanya saat status = "revisi"
      */
     public function delete(User $user, Proposal $proposal): bool
     {
-        // Opsi B: delete sama rule-nya dengan update
-        return $this->update($user, $proposal);
+        if ($user->hasRole('super_admin')) return true;
+
+        // Romo / Sekretaris 1/2 boleh kapan saja
+        if ($this->isRomo($user) || $this->isSekretaris12($user)) {
+            return true;
+        }
+
+        // Ketua Sie (pengaju) boleh hapus jika revisi
+        return $proposal->created_by === $user->id
+            && $proposal->status === 'revisi';
     }
 
-    /**
-     * Approve
-     */
-    public function approve(User $user, Proposal $proposal): bool
+    public function viewFile(User $user, Proposal $proposal): bool
+    {
+        return $this->view($user, $proposal);
+    }
+
+    public function downloadFile(User $user, Proposal $proposal): bool
+    {
+        return $this->view($user, $proposal);
+    }
+
+    public function endDppHarian(User $user, Proposal $proposal): bool
     {
         if ($user->hasRole('super_admin')) return true;
-        if (! $user->hasRole('tim_inti')) return false;
 
-        // hanya bisa approve kalau sedang direview
-        if ($proposal->status !== 'review') return false;
+        $allowed = $this->isSekretaris12($user) || $this->isRomo($user);
 
-        $jabatan = $this->jabatanKey($user);
-
-        return match ($proposal->stage) {
-            'ketua' => $jabatan === 'ketua',
-            'bendahara_1' => $jabatan === 'bendahara_1',
-            'bendahara_2' => $jabatan === 'bendahara_2',
-            default => false,
-        };
-    }
-
-    /**
-     * Reject
-     */
-    public function reject(User $user, Proposal $proposal): bool
-    {
-        // rule reject sama dengan approve (sesuai stage)
-        return $this->approve($user, $proposal);
-    }
-
-    /**
-     * Determine whether the user can restore the model.
-     */
-    public function restore(User $user, Proposal $proposal): bool
-    {
-        return false;
-    }
-
-    /**
-     * Determine whether the user can permanently delete the model.
-     */
-    public function forceDelete(User $user, Proposal $proposal): bool
-    {
-        return false;
+        return $allowed && $proposal->stage === 'dpp_harian' && $proposal->status === 'dpp_harian';
     }
 }

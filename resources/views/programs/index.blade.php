@@ -9,7 +9,7 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
             {{-- Create Button --}}
-            @can('create', \App\Models\Program::class)
+            @can('program.create')
                 <div>
                     <a href="{{ route('programs.create') }}"
                     class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
@@ -69,14 +69,14 @@
 
                                         <td class="px-4 py-3">
                                             <div class="flex gap-2 justify-center">
-                                                @can('view', $program)
+                                                @can('program.view')
                                                     <a href="{{ route('programs.show', $program) }}"
                                                     class="px-3 py-1 bg-gray-700 text-white rounded text-sm hover:bg-gray-800">
                                                         Detail
                                                     </a>
                                                 @endcan
 
-                                                @can('delete', $program)
+                                                @can('program.delete_pending')
                                                     <button
                                                         onclick="confirmDelete({{ $program->id }})"
                                                         class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700">

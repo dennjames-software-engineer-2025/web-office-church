@@ -10,8 +10,13 @@ class Bidang extends Model
     use HasFactory;
 
     protected $fillable = [
+        'kedudukan',
         'nama_bidang',
         'is_active',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
     ];
 
     public function scopeActive($query)
@@ -19,25 +24,25 @@ class Bidang extends Model
         return $query->where('is_active', true);
     }
 
-    // Relasi ke Sie
-    // Tiap bidang bisa mempunyai banyak Sie
-    public function sies() 
+    public function scopeForKedudukan($query, string $kedudukan)
+    {
+        return $query->where('kedudukan', $kedudukan);
+    }
+
+    public function sies()
     {
         return $this->hasMany(Sie::class);
     }
 
-    // Relasi dengan User
-    // Tiap Bidang bisa mempunyak banyak User
-    // Models User <One to Many> Bidang
     public function users()
     {
         return $this->hasMany(User::class);
     }
 
-    public function templates() 
+    public function templates()
     {
         return $this->belongsToMany(Template::class, 'template_bidang')
-        ->withTimestamps();
+            ->withTimestamps();
     }
 
     public function ketua()

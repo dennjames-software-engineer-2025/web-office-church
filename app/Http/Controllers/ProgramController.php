@@ -19,12 +19,32 @@ class ProgramController extends Controller
     {
         $user = Auth::user();
 
-        if ($user->hasRole('tim_bidang')) {
-            $programs = Program::where('bidang_id', $user->bidang_id)->latest()->get();
-        } else {
+        // super admin: lihat semua
+        if ($user->hasRole('super_admin')) {
             $programs = Program::latest()->get();
+            return view('programs.index', compact('programs'));
         }
 
+        // pembuat program (bidang/komunitas): lihat program bidangnya
+        if ($user->hasAnyRole(['ketua_bidang','ketua_sie','anggota_komunitas'])) {
+            $programs = Program::where('bidang_id', $user->bidang_id)
+                ->latest()
+                ->get();
+
+            return view('programs.index', compact('programs'));
+        }
+
+        // pihak penanggung jawab (ketua/wakil/sekretaris/bendahara): lihat program yang targetnya sesuai kedudukan dia
+        if ($user->hasAnyRole(['ketua','wakil_ketua','sekretaris','bendahara'])) {
+            $programs = Program::where('target_kedudukan', $user->kedudukan)
+                ->latest()
+                ->get();
+
+            return view('programs.index', compact('programs'));
+        }
+
+        // default: kosong (seharusnya tidak kepakai)
+        $programs = collect();
         return view('programs.index', compact('programs'));
     }
 
@@ -42,9 +62,17 @@ class ProgramController extends Controller
             'deskripsi'         => 'nullable|string',
             'tanggal_mulai'     => 'required|date',
             'tanggal_selesai'   => 'required|date|after_or_equal:tanggal_mulai',
+            'target_kedudukan'  => 'required|in:dpp_inti,lingkungan,bgkp,sekretariat',
         ]);
 
         $user = Auth::user();
+
+        $target = $validated['target_kedudukan'];
+
+        // sementara: jika pengaju komunitas, target dipaksa ke DPP Inti
+        if ($user->hasRole('anggota_komunitas')) {
+            $target = 'dpp_inti';
+        }
 
         $program = Program::create([
             'nama_program'      => $validated['nama_program'],
@@ -54,6 +82,7 @@ class ProgramController extends Controller
             'status'            => 'draft',
             'bidang_id'         => $user->bidang_id,
             'created_by'        => $user->id,
+            'target_kedudukan'  => $target,
         ]);
 
         return redirect()

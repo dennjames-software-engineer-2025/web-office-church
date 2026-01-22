@@ -10,20 +10,29 @@ class Proposal extends Model
     use HasFactory;
 
     protected $fillable = [
-        'program_id',
         'created_by',
+        'bidang_id',
+        'sie_id',
+
         'judul',
         'tujuan',
+
         'status',
         'stage',
 
-        'ketua_approved_by',
-        'ketua_approved_at',
-        'bendahara1_approved_by',
-        'bendahara1_approved_at',
-        'bendahara2_approved_by',
-        'bendahara2_approved_at',
+        'dpp_harian_until',
+        'notes',
 
+        'ketua_bidang_approved_by',
+        'ketua_bidang_approved_at',
+
+        'romo_approved_by',
+        'romo_approved_at',
+
+        'proposal_no',
+        'receipt_path',
+
+        // reject info (kamu sudah punya)
         'reject_reason',
         'rejected_by',
         'rejected_at',
@@ -31,20 +40,25 @@ class Proposal extends Model
     ];
 
     protected $casts = [
-        'ketua_approved_at'         => 'datetime',
-        'bendahara1_approved_at'    => 'datetime',
-        'bendahara2_approved_at'    => 'datetime',
+        'dpp_harian_until'          => 'datetime',
+        'ketua_bidang_approved_at'  => 'datetime',
+        'romo_approved_at'          => 'datetime',
         'rejected_at'               => 'datetime',
     ];
 
-    public function program()
-    {
-        return $this->belongsTo(Program::class);
-    }
-
     public function pengaju()
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function bidang()
+    {
+        return $this->belongsTo(Bidang::class);
+    }
+
+    public function sie()
+    {
+        return $this->belongsTo(Sie::class);
     }
 
     public function files()

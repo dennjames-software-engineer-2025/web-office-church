@@ -9,49 +9,59 @@ use Illuminate\Validation\Rule;
 
 class BidangController extends Controller
 {
-    public function index()
-    {
-        // tampilkan semua bidang (aktif dan nonaktif) agar admin bisa manage
-        $bidangs = Bidang::orderBy('nama_bidang')->get();
+    private array $kedudukanOptions = [
+        'dpp_inti' => 'DPP Inti',
+        'bgkp' => 'BGKP',
+        'lingkungan' => 'Lingkungan',
+        'sekretariat' => 'Sekretariat',
+    ];
 
-        return view('bidangs.index', compact('bidangs'));
+    public function index(Request $request)
+    {
+        $kedudukan = $request->query('kedudukan', 'dpp_inti');
+        if (!array_key_exists($kedudukan, $this->kedudukanOptions)) {
+            $kedudukan = 'dpp_inti';
+        }
+
+        $bidangs = Bidang::query()
+            ->where('kedudukan', $kedudukan)
+            ->withCount('sies')
+            ->with([
+                'ketua:id,name,bidang_id',
+                'sies.users:id,name,email,sie_id',
+            ])
+            ->orderBy('nama_bidang')
+            ->get();
+
+        $kedudukanOptions = $this->kedudukanOptions;
+
+        return view('bidangs.index', compact('bidangs', 'kedudukan', 'kedudukanOptions'));
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
+            'kedudukan' => ['required', Rule::in(array_keys($this->kedudukanOptions))],
             'nama_bidang' => [
                 'required',
                 'string',
                 'max:255',
-                // unik untuk semua bidang (case-insensitive diselesaikan via lower() di DB idealnya)
-                Rule::unique('bidangs', 'nama_bidang'),
+                // unik PER kedudukan
+                Rule::unique('bidangs', 'nama_bidang')->where(function ($q) use ($request) {
+                    return $q->where('kedudukan', $request->input('kedudukan'));
+                }),
             ],
         ]);
 
         Bidang::create([
+            'kedudukan'   => $validated['kedudukan'],
             'nama_bidang' => $validated['nama_bidang'],
-            'is_active'   => true, // default aktif
+            'is_active'   => true,
         ]);
 
         return redirect()
-            ->route('bidangs.index')
+            ->route('bidangs.index', ['kedudukan' => $validated['kedudukan']])
             ->with('status', 'Bidang berhasil ditambahkan.');
-    }
-
-    public function destroy(Bidang $bidang)
-    {
-        // Hapus semua sie di dalam bidang
-        foreach ($bidang->sies as $sie) {
-            $sie->delete();
-        }
-
-        // Hapus bidang
-        $bidang->delete();
-
-        return redirect()
-            ->route('bidangs.index')
-            ->with('status', 'Bidang berhasil dihapus.');
     }
 
     public function update(Request $request, Bidang $bidang)
@@ -61,8 +71,10 @@ class BidangController extends Controller
                 'required',
                 'string',
                 'max:255',
-                // unik, tapi ignore bidang yang sedang diedit
-                Rule::unique('bidangs', 'nama_bidang')->ignore($bidang->id),
+                // unik PER kedudukan, ignore bidang ini
+                Rule::unique('bidangs', 'nama_bidang')
+                    ->where(fn ($q) => $q->where('kedudukan', $bidang->kedudukan))
+                    ->ignore($bidang->id),
             ],
         ]);
 
@@ -71,25 +83,34 @@ class BidangController extends Controller
         ]);
 
         return redirect()
-            ->route('bidangs.index')
+            ->route('bidangs.index', ['kedudukan' => $bidang->kedudukan])
             ->with('status', 'Bidang berhasil diperbarui.');
+    }
+
+    public function destroy(Bidang $bidang)
+    {
+        $kedudukan = $bidang->kedudukan;
+        $bidang->delete();
+
+        return redirect()
+            ->route('bidangs.index', ['kedudukan' => $kedudukan])
+            ->with('status', 'Bidang berhasil dihapus.');
     }
 
     public function toggle(Bidang $bidang)
     {
         DB::transaction(function () use ($bidang) {
-            // toggle bidang
             $bidang->is_active = ! $bidang->is_active;
             $bidang->save();
 
-            // OPTIONAL (recommended): kalau bidang dinonaktifkan, semua sie di bawahnya ikut nonaktif
+            // kalau bidang nonaktif, sie ikut nonaktif
             if (! $bidang->is_active) {
                 $bidang->sies()->update(['is_active' => false]);
             }
         });
 
         return redirect()
-            ->route('bidangs.index')
+            ->route('bidangs.index', ['kedudukan' => $bidang->kedudukan])
             ->with('status', 'Status bidang berhasil diubah.');
     }
 }
