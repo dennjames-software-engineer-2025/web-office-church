@@ -1,35 +1,53 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-col gap-1">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
                 Detail User
             </h2>
-
-            <div class="flex items-center gap-2">
-                <a href="{{ route('users.index') }}"
-                   class="inline-flex items-center px-4 py-2 bg-white border border-gray-200 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-50">
-                    Kembali
-                </a>
-
-                @can('users.manage')
-                    <a href="{{ route('users.edit', $user) }}"
-                       class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700">
-                        Edit
-                    </a>
-                @endcan
-            </div>
+            <p class="text-sm text-gray-500">
+                Informasi lengkap akun user.
+            </p>
         </div>
     </x-slot>
 
     <div class="py-6">
-        <div class="max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-6">
+        <div class="max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-4">
 
-            {{-- Flash error --}}
+            {{-- Flash status/error --}}
+            @if (session('status'))
+                <div class="rounded-lg bg-green-50 border border-green-200 text-green-700 px-4 py-3">
+                    {{ session('status') }}
+                </div>
+            @endif
+
             @if (session('error'))
                 <div class="rounded-lg bg-red-50 border border-red-200 text-red-700 px-4 py-3">
                     {{ session('error') }}
                 </div>
             @endif
+
+            {{-- ✅ ACTION BUTTONS (di atas card, bukan header) --}}
+            <div class="flex items-center justify-end gap-2">
+                <a href="{{ route('users.index') }}"
+                   class="inline-flex items-center px-4 py-2 bg-white border border-gray-200 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-50">
+                    Kembali
+                </a>
+
+                <a href="{{ route('users.edit', $user) }}"
+                   class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700">
+                    Edit
+                </a>
+
+                <form id="deleteForm" method="POST" action="{{ route('users.destroy', $user) }}">
+                    @csrf
+                    @method('DELETE')
+                    <button type="button"
+                            onclick="confirmDelete()"
+                            class="inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-700">
+                        Hapus
+                    </button>
+                </form>
+            </div>
 
             {{-- Card: Info --}}
             <div class="bg-white p-6 sm:p-8 shadow sm:rounded-lg">
@@ -39,7 +57,6 @@
                         <p class="text-sm text-gray-600 mt-1">{{ $user->email }}</p>
                     </div>
 
-                    {{-- Status badge --}}
                     @php
                         $statusClass = match($user->status) {
                             'active'    => 'bg-green-50 text-green-700 border-green-200',
@@ -71,7 +88,6 @@
 
                 <div class="border-t my-6"></div>
 
-                {{-- Detail --}}
                 <dl class="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>
                         <dt class="text-sm font-medium text-gray-500">Jabatan</dt>
@@ -104,7 +120,6 @@
                         </dd>
                     </div>
 
-                    {{-- Jika ditolak --}}
                     @if ($user->status === 'rejected' && $user->alasan_ditolak)
                         <div class="sm:col-span-2">
                             <dt class="text-sm font-medium text-red-600">Alasan Ditolak</dt>
@@ -116,60 +131,14 @@
                 </dl>
             </div>
 
-            {{-- Card: Danger Zone --}}
-            @can('users.manage')
-                <div class="bg-white p-6 sm:p-8 shadow sm:rounded-lg border border-red-100">
-                    <h4 class="text-lg font-semibold text-gray-900">Danger Zone</h4>
-                    <p class="text-sm text-gray-600 mt-1">
-                        Menghapus akun akan melakukan <span class="font-semibold">soft delete</span>. Anda wajib mengisi alasan penghapusan.
-                    </p>
-
-                    <form id="deleteForm" method="POST" action="{{ route('users.destroy', $user) }}" class="mt-6">
-                        @csrf
-                        @method('DELETE')
-
-                        <div>
-                            <x-input-label for="alasan_dihapus" value="Alasan Penghapusan" />
-                            <textarea
-                                name="alasan_dihapus"
-                                id="alasan_dihapus"
-                                rows="4"
-                                class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
-                                placeholder="Contoh: Akun tidak digunakan lagi / terjadi pergantian personel / dll"
-                                required>{{ old('alasan_dihapus') }}</textarea>
-                            <x-input-error :messages="$errors->get('alasan_dihapus')" class="mt-2" />
-                        </div>
-
-                        <div class="mt-4 flex justify-end">
-                            <button type="button"
-                                    onclick="confirmDelete()"
-                                    class="inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-700">
-                                Hapus Akun
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            @endcan
-
         </div>
     </div>
 
     <script>
         function confirmDelete() {
-            const alasan = document.getElementById('alasan_dihapus').value.trim();
-
-            if (!alasan) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Alasan wajib diisi',
-                    text: 'Anda harus memasukkan alasan penghapusan akun.'
-                });
-                return;
-            }
-
             Swal.fire({
                 title: "Yakin ingin menghapus akun ini?",
-                text: "Tindakan tidak dapat dibatalkan.",
+                text: "Akun akan di-soft delete (hilang dari UI).",
                 icon: "warning",
                 showCancelButton: true,
                 confirmButtonColor: "#dc2626",

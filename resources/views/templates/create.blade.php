@@ -5,7 +5,7 @@
                 Upload Template Baru
             </h2>
             <p class="text-sm text-gray-500">
-                Upload file template (PDF/Word/Excel/PPT). Untuk Tim Inti bisa memilih dibagikan ke bidang.
+                Upload file template (PDF/Word/Excel/PPT).
             </p>
         </div>
     </x-slot>
@@ -23,7 +23,6 @@
             <div class="bg-white shadow sm:rounded-lg">
                 <div class="p-6 space-y-6">
 
-                    {{-- Error global --}}
                     @if ($errors->any())
                         <div class="p-4 text-red-700 bg-red-50 border border-red-200 rounded-lg">
                             <div class="font-semibold">Gagal menyimpan template:</div>
@@ -38,7 +37,6 @@
                     <form method="POST" action="{{ route('templates.store') }}" enctype="multipart/form-data" class="space-y-6">
                         @csrf
 
-                        {{-- Judul --}}
                         <div>
                             <x-input-label for="title" value="Judul Template" />
                             <x-text-input id="title"
@@ -50,7 +48,6 @@
                             <x-input-error class="mt-2" :messages="$errors->get('title')" />
                         </div>
 
-                        {{-- File --}}
                         <div>
                             <x-input-label for="file" value="File Template" />
                             <input id="file"
@@ -62,29 +59,6 @@
                             <x-input-error class="mt-2" :messages="$errors->get('file')" />
                             <div class="text-xs text-gray-500 mt-2">Maks 10 MB.</div>
                         </div>
-
-                        {{-- Share bidang (khusus tim inti / super admin) --}}
-                        @hasanyrole('super_admin|ketua|wakil_ketua|sekretaris|bendahara')
-                            <div class="border rounded-lg p-4 bg-gray-50">
-                                <div class="font-semibold text-gray-900 mb-2">
-                                    Bagikan ke Bidang (opsional)
-                                </div>
-
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                    @foreach($bidangs as $b)
-                                        <label class="flex items-center gap-2 text-sm">
-                                            <input type="checkbox" name="share_bidangs[]" value="{{ $b->id }}"
-                                                {{ in_array($b->id, old('share_bidangs', [])) ? 'checked' : '' }}>
-                                            <span>{{ $b->nama_bidang }}</span>
-                                        </label>
-                                    @endforeach
-                                </div>
-
-                                <div class="text-xs text-gray-500 mt-2">
-                                    Jika tidak dicentang, template inti hanya terlihat oleh Tim Inti & Super Admin.
-                                </div>
-                            </div>
-                        @endhasanyrole
 
                         <div class="flex justify-end gap-2">
                             <a href="{{ route('templates.index') }}"

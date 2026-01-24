@@ -18,21 +18,27 @@ class User extends Authenticatable
         'email',
         'password',
 
-        // kolom tambahan (pastikan ada di migration users)
         'status',
-        'jabatan',          // contoh: ketua, wakil_ketua, sekretaris_1, bendahara_2, ketua_bidang, ketua_sie, ketua_lingkungan, anggota_komunitas
-        'team_type',        // kalau masih dipakai, kalau tidak nanti kita buang
+        'jabatan',
+        'jabatan_key',          // ✅ wajib
+        'team_type',
         'bidang_id',
         'sie_id',
-        'alasan_ditolak',
         'kedudukan',
+        'alasan_ditolak',
+        'alasan_dihapus',
+
+        // ✅ khusus Lingkungan (brief baru)
+        'lingkungan_scope',     // wilayah|lingkungan
+        'wilayah',              // wilayah_1..wilayah_7
+        'lingkungan',           // nama lingkungan
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
     ];
-    
+
     protected static function booted()
     {
         static::deleting(function (User $user) {
@@ -51,7 +57,6 @@ class User extends Authenticatable
         ];
     }
 
-    // Relasi struktur lama (kalau masih dipakai)
     public function bidang()
     {
         return $this->belongsTo(Bidang::class);
@@ -62,13 +67,11 @@ class User extends Authenticatable
         return $this->belongsTo(Sie::class);
     }
 
-    // Kalau kamu punya model Document, pastikan namespace-nya benar
     public function documents()
     {
         return $this->hasMany(\App\Models\Document::class);
     }
 
-    // Label jabatan untuk UI
     public function getJabatanLabelAttribute(): string
     {
         if (! $this->jabatan) return '-';
@@ -89,22 +92,34 @@ class User extends Authenticatable
             'ketua_sie'          => 'Ketua Sie',
 
             'ketua_lingkungan'   => 'Ketua Lingkungan',
+            'wakil_ketua_lingkungan' => 'Wakil Ketua Lingkungan',
+
             'anggota_komunitas'  => 'Anggota Komunitas',
+
+            'sekretariat'        => 'Sekretariat',
         ];
 
         return $map[$this->jabatan] ?? Str::title(str_replace('_', ' ', $this->jabatan));
+    }
+
+    /**
+     * DPP Harian = jabatan DPP inti (ketua/wakil/sekretaris/bendahara).
+     */
+    public function isDppHarian(): bool
+    {
+        return in_array($this->jabatan, [
+            'ketua','wakil_ketua','sekretaris_1','sekretaris_2','bendahara_1','bendahara_2',
+        ], true);
     }
 
     public function canManageMinutes(): bool
     {
         if ($this->hasRole('super_admin')) return true;
 
-        $isSekretaris = $this->hasRole('sekretaris');
+        // kamu pakai role "sekretaris" untuk sekretaris_1 & sekretaris_2
+        if (! $this->hasRole('sekretaris')) return false;
 
-        $jabatan = strtolower($this->jabatan ?? '');
-        $isSek1or2 = str_contains($jabatan, 'sekretaris 1') || str_contains($jabatan, 'sekretaris 2');
-
-        return $isSekretaris && $isSek1or2;
+        return in_array($this->jabatan, ['sekretaris_1', 'sekretaris_2'], true);
     }
 
     public function canManageAnnouncements(): bool

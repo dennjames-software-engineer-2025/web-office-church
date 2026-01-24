@@ -30,7 +30,7 @@ class DatabaseSeeder extends Seeder
             RolePermissionSeeder::class,
             BidangSieSeeder::class,
             SuperAdminSeeder::class,
-            DemoAccountsSeeder::class,
+            // DemoAccountsSeeder::class,
         ]);
     }
 }

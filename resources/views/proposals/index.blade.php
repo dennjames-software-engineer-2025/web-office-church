@@ -65,7 +65,7 @@
                                         <th class="px-4 py-3">Pengaju</th>
                                         <th class="px-4 py-3">Status</th>
                                         <th class="px-4 py-3">Tahap</th>
-                                        <th class="px-4 py-3">Tanggal</th>
+                                        {{-- <th class="px-4 py-3">Tanggal</th> --}}
                                         <th class="px-4 py-3 text-center">Aksi</th>
                                     </tr>
                                 </thead>
@@ -122,13 +122,24 @@
                                                 ($p->stage ?? '').' '.
                                                 ($p->proposal_no ?? '')
                                             );
+
+                                            $files = collect($p->files ?? []);
+                                            $fileCount = $files->count();
+
+                                            // JSON untuk SweetAlert (multi-file)
+                                            $filesJson = $files->map(fn($f) => [
+                                                'id' => $f->id,
+                                                'name' => $f->original_name,
+                                            ])->values()->toJson();
                                         @endphp
 
                                         <tr class="hover:bg-gray-50 proposal-row" data-search="{{ $searchHaystack }}">
+
+                                            {{-- Nama Proposal --}}
                                             <td class="px-4 py-3">
                                                 <div class="font-semibold text-gray-900">{{ $p->judul }}</div>
                                                 <div class="text-xs text-gray-500 mt-1">
-                                                    Lampiran: {{ $p->files?->count() ?? 0 }} file
+                                                    Lampiran: {{ $fileCount }} file
                                                     @if(!empty($p->proposal_no))
                                                         • No: <span class="font-semibold text-gray-700">{{ $p->proposal_no }}</span>
                                                     @endif
@@ -137,17 +148,23 @@
                                                     {{ \Illuminate\Support\Str::limit($p->tujuan ?? '-', 80) }}
                                                 </div>
                                             </td>
+                                            {{-- Nama Proposal --}}
 
+                                            {{-- Nama Bidang --}}
                                             <td class="px-4 py-3">
                                                 <div class="text-sm text-gray-900">{{ $bidangName }}</div>
                                                 <div class="text-xs text-gray-500 mt-1">{{ $sieName }}</div>
                                             </td>
+                                            {{-- Nama Bidang --}}
 
+                                            {{-- Nama Pengaju --}}
                                             <td class="px-4 py-3">
                                                 <div class="text-sm text-gray-900">{{ $pengajuName }}</div>
                                                 <div class="text-xs text-gray-500 mt-1">{{ $p->pengaju?->email ?? '-' }}</div>
                                             </td>
+                                            {{-- Nama Pengaju --}}
 
+                                            {{-- Status --}}
                                             <td class="px-4 py-3">
                                                 <span class="inline-flex items-center px-2 py-1 rounded-full text-xs {{ $statusClass }}">
                                                     {{ $statusLabel }}
@@ -159,45 +176,70 @@
                                                     </div>
                                                 @endif
                                             </td>
+                                            {{-- Status --}}
 
+                                            {{-- Tahap --}}
                                             <td class="px-4 py-3">
                                                 <span class="inline-flex items-center px-2 py-1 rounded-full text-xs {{ $stageClass }}">
                                                     {{ $stageLabel }}
                                                 </span>
                                             </td>
+                                            {{-- Tahap --}}
 
+                                            {{-- Tanggal --}}
                                             <td class="px-4 py-3">
                                                 <div class="text-sm text-gray-900">{{ optional($p->created_at)->format('d-m-Y') }}</div>
                                                 <div class="text-xs text-gray-500">{{ optional($p->created_at)->format('H:i') }}</div>
                                             </td>
+                                            {{-- Tanggal --}}
 
-                                            {{-- Kolom Aksi --}}
+                                            {{-- AKSI (KONSISTEN: Preview, Download, + Folder) --}}
                                             <td class="px-4 py-3">
                                                 <div class="flex items-center justify-center gap-2 flex-wrap">
-                                                    <a href="{{ route('proposals.show', $p) }}"
-                                                       class="px-3 py-2 rounded-lg bg-gray-800 text-white hover:bg-gray-900 text-sm">
-                                                        Detail
-                                                    </a>
 
-                                                    @can('delete', $p)
-                                                        <form method="POST"
-                                                              action="{{ route('proposals.destroy', $p) }}"
-                                                              class="proposal-delete-form"
-                                                              data-title="{{ $p->judul }}">
-                                                            @csrf
-                                                            @method('DELETE')
-                                                            <button type="submit"
-                                                                    class="px-3 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm">
-                                                                Hapus
-                                                            </button>
-                                                        </form>
-                                                    @endcan
+                                                    {{-- PREVIEW --}}
+                                                    @if($fileCount === 1)
+                                                        @php
+                                                            $onlyFile = $files->first();
+                                                        @endphp
+                                                        <a href="{{ route('proposals.files.preview', ['proposal' => $p->id, 'file' => $onlyFile->id]) }}"
+                                                           target="_blank"
+                                                           class="px-3 py-2 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 text-sm">
+                                                            Preview
+                                                        </a>
+                                                    @else
+                                                        <button type="button"
+                                                                class="px-3 py-2 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 text-sm"
+                                                                data-proposal-id="{{ $p->id }}"
+                                                                data-files='{!! $filesJson !!}'
+                                                                data-action="preview"
+                                                                onclick="openProposalFileAction(this)">
+                                                            Preview
+                                                        </button>
+                                                    @endif
 
-                                                    {{-- Fitur Manage Files --}}
+                                                    {{-- DOWNLOAD --}}
+                                                    @if($fileCount === 1)
+                                                        <a href="{{ route('proposals.files.download', ['proposal' => $p->id, 'file' => $onlyFile->id]) }}"
+                                                           class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">
+                                                            Download
+                                                        </a>
+                                                    @else
+                                                        <button type="button"
+                                                                class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm"
+                                                                data-proposal-id="{{ $p->id }}"
+                                                                data-files='{!! $filesJson !!}'
+                                                                data-action="download"
+                                                                onclick="openProposalFileAction(this)">
+                                                            Download
+                                                        </button>
+                                                    @endif
+
+                                                    {{-- + Folder --}}
                                                     @can('files.manage')
                                                         @if(($folders ?? collect())->isEmpty())
                                                             <a href="{{ route('folders.index') }}"
-                                                            class="px-3 py-2 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-sm">
+                                                               class="px-3 py-2 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-sm">
                                                                 Buat Folder dulu
                                                             </a>
                                                         @else
@@ -209,22 +251,20 @@
                                                                     </svg>
                                                                 </summary>
 
-                                                                {{-- ✅ Samakan dengan Dokumen: TIDAK perlu tampilkan "File: ..." --}}
                                                                 <div class="absolute right-0 mt-2 w-64 bg-white border rounded-lg shadow-lg p-3 z-20">
                                                                     <form method="POST" onsubmit="return submitToFolderProposal(this);">
                                                                         @csrf
 
-                                                                        {{-- WAJIB --}}
                                                                         <input type="hidden" name="source" value="proposal_file">
 
-                                                                        {{-- Jika hanya 1 file: auto set (tanpa teks apapun) --}}
-                                                                        @if(($p->files?->count() ?? 0) === 1)
-                                                                            <input type="hidden" name="source_id" value="{{ $p->files->first()->id }}">
+                                                                        {{-- 1 file = hidden; multi file = select (tanpa teks "File: ...") --}}
+                                                                        @if($fileCount === 1)
+                                                                            <input type="hidden" name="source_id" value="{{ $files->first()->id }}">
                                                                         @else
                                                                             <label class="text-xs text-gray-600">Pilih file proposal</label>
                                                                             <select name="source_id" class="mt-1 w-full border-gray-300 rounded text-sm">
                                                                                 <option value="">Pilih file...</option>
-                                                                                @foreach($p->files as $pf)
+                                                                                @foreach($files as $pf)
                                                                                     <option value="{{ $pf->id }}">{{ $pf->original_name }}</option>
                                                                                 @endforeach
                                                                             </select>
@@ -247,11 +287,9 @@
                                                             </details>
                                                         @endif
                                                     @endcan
-                                                    {{-- End Fitur Manage Files --}}
 
                                                 </div>
                                             </td>
-                                            {{-- End Kolom Aksi --}}
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -276,9 +314,9 @@
     {{-- SweetAlert2 --}}
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-    {{-- Flash + Delete confirm --}}
     @once
         <script>
+            // Search (client-side)
             const proposalSearch = document.getElementById('proposalSearch');
             const proposalRows = document.querySelectorAll('.proposal-row');
             const proposalNoResult = document.getElementById('proposalNoResult');
@@ -299,60 +337,88 @@
                 });
             }
 
-            @if (session('status'))
-                Swal.fire({ icon: 'success', title: 'Berhasil', text: @json(session('status')) });
-            @endif
-            @if (session('error'))
-                Swal.fire({ icon: 'error', title: 'Terjadi Kesalahan', text: @json(session('error')) });
-            @endif
+            /**
+             * Multi-file Preview/Download: pilih file lewat SweetAlert lalu redirect ke route yang benar.
+             * NOTE: route butuh 2 parameter: {proposal} dan {file}
+             */
+            function openProposalFileAction(btn) {
+                const action = btn.getAttribute('data-action'); // preview | download
+                const proposalId = btn.getAttribute('data-proposal-id');
+                let files = [];
 
-            // Delete confirm via Swal
-            document.querySelectorAll('.proposal-delete-form').forEach(form => {
-                form.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    const title = form.getAttribute('data-title') || 'proposal ini';
+                try {
+                    files = JSON.parse(btn.getAttribute('data-files') || '[]');
+                } catch (e) {
+                    files = [];
+                }
 
-                    const res = await Swal.fire({
-                        icon: 'warning',
-                        title: 'Hapus Proposal?',
-                        text: `Yakin ingin menghapus "${title}"? Semua lampiran & bukti penerimaan ikut terhapus.`,
-                        showCancelButton: true,
-                        confirmButtonText: 'Ya, hapus',
-                        cancelButtonText: 'Batal'
-                    });
+                if (!files.length) {
+                    Swal.fire('Tidak ada file lampiran', '', 'warning');
+                    return;
+                }
 
-                    if (res.isConfirmed) form.submit();
+                // bikin opsi select
+                const inputOptions = {};
+                files.forEach(f => {
+                    inputOptions[String(f.id)] = f.name;
                 });
-            });
-        </script>
-    @endonce
 
-    <script>
-        function submitToFolderProposal(form) {
-            const folderId = form.querySelector('[name="folder_id"]').value;
+                Swal.fire({
+                    title: (action === 'preview') ? 'Pilih file untuk Preview' : 'Pilih file untuk Download',
+                    input: 'select',
+                    inputOptions,
+                    inputPlaceholder: 'Pilih file...',
+                    showCancelButton: true,
+                    confirmButtonText: 'Lanjut',
+                    cancelButtonText: 'Batal',
+                    inputValidator: (value) => {
+                        if (!value) return 'Pilih file dulu';
+                    }
+                }).then((result) => {
+                    if (!result.isConfirmed) return;
 
-            // source_id ada kalau multi-file, kalau single-file dia hidden
-            const sourceIdEl = form.querySelector('[name="source_id"]');
-            const sourceId = sourceIdEl ? sourceIdEl.value : '';
+                    const fileId = result.value;
 
-            if (!sourceIdEl || !sourceId) {
-                // kalau source_id element tidak ada, berarti single-file hidden sudah ada, aman
-                // kalau ada element tapi kosong, berarti user belum pilih file
-                if (sourceIdEl && !sourceId) {
+                    // URL template dari Laravel (paling aman)
+                    const previewTpl = @json(route('proposals.files.preview', ['proposal' => '__PROPOSAL__', 'file' => '__FILE__']));
+                    const downloadTpl = @json(route('proposals.files.download', ['proposal' => '__PROPOSAL__', 'file' => '__FILE__']));
+
+                    const url = (action === 'preview')
+                        ? previewTpl.replace('__PROPOSAL__', proposalId).replace('__FILE__', fileId)
+                        : downloadTpl.replace('__PROPOSAL__', proposalId).replace('__FILE__', fileId);
+
+                    if (action === 'preview') {
+                        window.open(url, '_blank');
+                    } else {
+                        window.location.href = url;
+                    }
+                });
+            }
+
+            /**
+             * Folder submit (pola sama seperti Dokumen)
+             */
+            function submitToFolderProposal(form) {
+                const folderId = form.querySelector('[name="folder_id"]').value;
+
+                // kalau multi-file: wajib pilih source_id
+                const sourceIdEl = form.querySelector('[name="source_id"]');
+                if (sourceIdEl && !sourceIdEl.value) {
                     Swal.fire('Pilih file proposal dulu', '', 'warning');
                     return false;
                 }
+
+                if (!folderId) {
+                    Swal.fire('Pilih folder dulu', '', 'warning');
+                    return false;
+                }
+
+                form.action = `/folders/${folderId}/items`;
+                return true;
             }
 
-            if (!folderId) {
-                Swal.fire('Pilih folder dulu', '', 'warning');
-                return false;
-            }
-
-            form.action = `/folders/${folderId}/items`;
-            return true;
-        }
-
-        window.submitToFolderProposal = submitToFolderProposal;
-    </script>
+            window.openProposalFileAction = openProposalFileAction;
+            window.submitToFolderProposal = submitToFolderProposal;
+        </script>
+    @endonce
 </x-app-layout>

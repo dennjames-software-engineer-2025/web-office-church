@@ -192,6 +192,7 @@
                                                             </details>
                                                         @endif
                                                     @endcan
+                                                    {{-- End Files Manage --}}
 
                                                 </div>
                                             </td>

@@ -168,116 +168,71 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ======================================================================
 
     // ===============================================================================================================================
-    // User
+    // USER MANAGEMENT 
     // ===============================================================================================================================
 
-    // USER PENDING
-    Route::get('/users/pending', [UserApprovalController::class, 'index'])
-    ->name('users.pending');
+    Route::middleware(['auth', 'verified', 'role:super_admin'])->group(function () {
+        Route::get('/users', [UserManagementController::class, 'index'])->name('users.index');
+        Route::get('/users/create', [UserManagementController::class, 'create'])->name('users.create');
+        Route::post('/users', [UserManagementController::class, 'store'])->name('users.store');
 
-    // USER APPROVE
-    Route::post('/users/{user}/approve', [UserApprovalController::class, 'approve'])
-    ->name('users.approve');
+        Route::get('/users/{user}', [UserManagementController::class, 'show'])->name('users.show');
+        Route::get('/users/{user}/edit', [UserManagementController::class, 'edit'])->name('users.edit');
+        Route::put('/users/{user}', [UserManagementController::class, 'update'])->name('users.update');
 
-    // USER REJECT
-    Route::post('/users/{user}/reject', [UserApprovalController::class, 'reject'])
-    ->name('users.reject');
-
-    // CREATE TIM INTI
-    Route::get('/users/create-tim-inti', [UserManagementController::class, 'create'])
-    ->middleware(['verified', 'role:super_admin'])
-    ->name('users.create');
-
-    // STORE TIM INTI
-    Route::post('/users/create-inti', [UserManagementController::class, 'store'])
-    ->middleware(['verified', 'role:super_admin'])
-    ->name('users.store');
-
-    // MENAMPILKAN HALAMAN MANAJEMEN USER
-    Route::get('/users', [UserManagementController::class, 'index'])
-        ->middleware(['verified', 'role:super_admin'])
-        ->name('users.index');
-
-    // MENAMPILKAN HALAMAN EDIT USER
-
-    Route::get('/users/{user}/edit', [UserManagementController::class, 'edit'])
-        ->middleware('verified', 'role:super_admin')
-        ->name('users.edit');
-    // End
-
-    // Simpan perubahan
-    Route::put('/users/{user}', [UserManagementController::class, 'update'])
-        ->whereNumber('user')
-        ->middleware('verified', 'role:super_admin')
-        ->name('users.update');
-    // End
-
-    // Menampilkan halaman Detail akun
-    Route::get('/users/{user}', [UserManagementController::class, 'show'])
-        ->middleware('verified', 'role:super_admin')
-        ->name('users.show');
-    // End
-
-    // Menghapus Akun User
-    Route::delete('/users/{user}', [UserManagementController::class, 'destroy'])
-        ->middleware('verified', 'role:super_admin')
-        ->name('users.destroy');
-    // End
+        Route::delete('/users/{user}', [UserManagementController::class, 'destroy'])->name('users.destroy');
+    });
 
     // ===============================================================================================================================
-    // End User
+    // END USER MANAGEMENT
     // ===============================================================================================================================
 
+    // ===============================================================================================================================
+    // BIDANG & SIE (SUPER ADMIN)
+    // ===============================================================================================================================
 
+    Route::middleware(['auth', 'verified', 'role:super_admin'])->group(function () {
 
-    // Mengunduh Template (Semua Role bisa melihat Template)
-    Route::get('/templates', [TemplateController::class, 'index'])->name('templates.index');
-    Route::get('/templates/{template}/download', [TemplateController::class, 'download'])->name('templates.download');
-    // End
-
-    // Upload Template
-    Route::post('/templates', [TemplateController::class, 'store'])->middleware(['auth', 'verified'])->name('templates.store');
-    // End
-
-    // Create Templates
-    Route::get('/templates/create', [TemplateController::class, 'create'])->name('templates.create');
-    // End
-
-    // Read Template
-    Route::get('/templates/{template}', [TemplateController::class, 'show'])->name('templates.show');
-
-    Route::get('/templates/{template}/stream', [TemplateController::class, 'stream'])
-    ->name('templates.stream');
-
-    Route::get('/templates/{template}/view', [TemplateController::class, 'view'])
-    ->name('templates.view');
-    // End
-
-    // Hapus Template
-    Route::delete('/templates/{template}', [TemplateController::class, 'destroy'])->middleware(['auth', 'verified'])->name('templates.destroy');
-    // End
-
-    /* Bidang */
-    Route::middleware(['auth', 'verified', 'permission:bidang.manage'])->group(function () {
         // BIDANG
         Route::get('/bidangs', [BidangController::class, 'index'])->name('bidangs.index');
         Route::post('/bidangs', [BidangController::class, 'store'])->name('bidangs.store');
         Route::put('/bidangs/{bidang}', [BidangController::class, 'update'])->name('bidangs.update');
-        Route::patch('/bidangs/{bidang}/toggle', [BidangController::class, 'toggle'])->name('bidangs.toggle');
         Route::delete('/bidangs/{bidang}', [BidangController::class, 'destroy'])->name('bidangs.destroy');
-    });
-    /* End */
+        Route::patch('/bidangs/{bidang}/toggle', [BidangController::class, 'toggle'])->name('bidangs.toggle');
 
-    /* Sie */
-    Route::middleware(['auth', 'verified', 'permission:sie.manage'])->group(function () {
-        // SIE
+        // SIE (khusus DPP Inti - sudah di-guard di controllernya)
         Route::get('/bidangs/{bidang}/sies', [SieController::class, 'index'])->name('sies.index');
         Route::post('/bidangs/{bidang}/sies', [SieController::class, 'store'])->name('sies.store');
+
         Route::put('/sies/{sie}', [SieController::class, 'update'])->name('sies.update');
-        Route::patch('/sies/{sie}/toggle', [SieController::class, 'toggle'])->name('sies.toggle');
         Route::delete('/sies/{sie}', [SieController::class, 'destroy'])->name('sies.destroy');
+        Route::patch('/sies/{sie}/toggle', [SieController::class, 'toggle'])->name('sies.toggle');
     });
-    /* End */
+
+    // ===============================================================================================================================
+    // END BIDANG & SIE
+    // ===============================================================================================================================
+
+    // ===============================================================================================================================
+    // FITUR MANAJEMEN TEMPLATE
+    // ===============================================================================================================================
+
+    Route::middleware(['auth', 'verified'])->group(function () {
+        Route::get('/templates', [TemplateController::class, 'index'])->name('templates.index');
+        Route::get('/templates/create', [TemplateController::class, 'create'])->name('templates.create');
+        Route::post('/templates', [TemplateController::class, 'store'])->name('templates.store');
+
+        Route::get('/templates/{template}', [TemplateController::class, 'show'])->name('templates.show');
+        Route::get('/templates/{template}/download', [TemplateController::class, 'download'])->name('templates.download');
+        Route::get('/templates/{template}/stream', [TemplateController::class, 'stream'])->name('templates.stream');
+        Route::get('/templates/{template}/view', [TemplateController::class, 'view'])->name('templates.view');
+
+        Route::delete('/templates/{template}', [TemplateController::class, 'destroy'])->name('templates.destroy');
+    });
+
+    // ===============================================================================================================================
+    // FITUR MANAJEMEN TEMPLATE
+    // ===============================================================================================================================
 
     // ==============================================================================================================================
     // Tools Signature Pad

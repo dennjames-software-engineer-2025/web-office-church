@@ -1,143 +1,123 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            Manajemen User
-        </h2>
+        <div class="flex flex-col gap-1">
+            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+                Manajemen User
+            </h2>
+            <p class="text-sm text-gray-500">
+                Kelola akun user berdasarkan kedudukan, jabatan, dan status.
+            </p>
+        </div>
     </x-slot>
 
     <div class="py-6">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-4">
 
-            {{-- Flash message --}}
-            @if (session('status'))
-                <div class="mb-4 rounded-lg bg-green-50 border border-green-200 text-green-700 px-4 py-3">
-                    {{ session('status') }}
-                </div>
-            @endif
+            {{-- FILTER BAR --}}
+            <div class="bg-white shadow sm:rounded-lg p-4">
+                <form method="GET" class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
 
-            {{-- Filter --}}
-            <div class="bg-white shadow sm:rounded-lg p-6 mb-6">
-                <form method="GET" action="{{ route('users.index') }}"
-                      class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-
-                    {{-- Filter Tim --}}
+                    {{-- Kedudukan --}}
                     <div class="md:col-span-3">
-                        <x-input-label value="Tim" />
-                        <select name="team_type"
-                                class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
+                        <x-input-label value="Kedudukan" />
+                        <select name="kedudukan" class="mt-1 w-full rounded-md border-gray-300">
                             <option value="">Semua</option>
-                            <option value="inti" {{ request('team_type') === 'inti' ? 'selected' : '' }}>Tim Inti</option>
-                            <option value="bidang" {{ request('team_type') === 'bidang' ? 'selected' : '' }}>Tim Bidang</option>
+                            <option value="dpp_inti" {{ request('kedudukan')==='dpp_inti'?'selected':'' }}>DPP</option>
+                            <option value="bgkp" {{ request('kedudukan')==='bgkp'?'selected':'' }}>BGKP</option>
+                            <option value="sekretariat" {{ request('kedudukan')==='sekretariat'?'selected':'' }}>Sekretariat</option>
+                            <option value="lingkungan" {{ request('kedudukan')==='lingkungan'?'selected':'' }}>Lingkungan</option>
                         </select>
                     </div>
 
-                    {{-- Filter Status --}}
-                    <div class="md:col-span-3">
+                    {{-- Status --}}
+                    <div class="md:col-span-2">
                         <x-input-label value="Status" />
-                        <select name="status"
-                                class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
+                        <select name="status" class="mt-1 w-full rounded-md border-gray-300">
                             <option value="">Semua</option>
-                            <option value="pending"  {{ request('status') === 'pending' ? 'selected' : '' }}>Pending</option>
-                            <option value="active"   {{ request('status') === 'active' ? 'selected' : '' }}>Active</option>
-                            <option value="rejected" {{ request('status') === 'rejected' ? 'selected' : '' }}>Rejected</option>
-                            <option value="suspended" {{ request('status') === 'suspended' ? 'selected' : '' }}>Suspended</option>
+                            <option value="active" {{ request('status')==='active'?'selected':'' }}>Active</option>
+                            <option value="suspended" {{ request('status')==='suspended'?'selected':'' }}>Suspended</option>
                         </select>
                     </div>
 
-                    {{-- Buttons Filter/Reset --}}
-                    <div class="md:col-span-4 flex gap-3">
-                        <button type="submit"
-                                class="inline-flex items-center px-4 py-2 bg-gray-100 border border-gray-200 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-200">
-                            Filter
-                        </button>
+                    {{-- Search --}}
+                    <div class="md:col-span-4">
+                        <x-input-label value="Cari" />
+                        <input type="text" name="q" value="{{ request('q') }}"
+                               placeholder="Nama / Email / Jabatan"
+                               class="mt-1 w-full rounded-md border-gray-300">
+                    </div>
 
-                        <a href="{{ route('users.index') }}"
-                           class="inline-flex items-center px-4 py-2 bg-white border border-gray-200 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-50">
-                            Reset
+                    {{-- Action --}}
+                    <div class="md:col-span-3 flex gap-2 justify-end">
+                        <button class="px-4 py-2 bg-gray-100 rounded-md text-sm">Filter</button>
+                        <a href="{{ route('users.index') }}" class="px-4 py-2 bg-white border rounded-md text-sm">Reset</a>
+
+                        <a href="{{ route('users.create') }}"
+                           class="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm">
+                            + Buat User
                         </a>
                     </div>
-
-                    {{-- Button Buat User --}}
-                    <div class="md:col-span-2 flex md:justify-end">
-                        @can('users.manage')
-                            <a href="{{ route('users.create') }}"
-                               class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700">
-                                Buat Akun User
-                            </a>
-                        @endcan
-                    </div>
-
                 </form>
             </div>
 
-            {{-- Table --}}
-            <div class="bg-white shadow sm:rounded-lg">
-                <div class="p-6">
+            {{-- TABLE --}}
+            <div class="bg-white shadow sm:rounded-lg overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-gray-50 text-gray-700 uppercase text-xs">
+                        <tr>
+                            <th class="px-4 py-3">Nama</th>
+                            <th class="px-4 py-3">Kedudukan</th>
+                            <th class="px-4 py-3">Jabatan</th>
+                            <th class="px-4 py-3">Status</th>
+                            <th class="px-4 py-3 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        @forelse($users as $u)
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3">
+                                    <div class="font-semibold">{{ $u->name }}</div>
+                                    <div class="text-xs text-gray-500">{{ $u->email }}</div>
+                                </td>
 
-                    @if ($users->isEmpty())
-                        <p class="text-center text-gray-500 py-10">
-                            Tidak ada akun user ditemukan.
-                        </p>
-                    @else
-                        <div class="overflow-x-auto rounded-lg border border-gray-200">
-                            <table class="min-w-full text-left text-sm">
-                                <thead class="bg-gray-50 text-gray-700">
-                                    <tr>
-                                        <th class="px-4 py-3 font-semibold">Nama</th>
-                                        <th class="px-4 py-3 font-semibold">Jabatan</th>
-                                        <th class="px-4 py-3 font-semibold">Status</th>
-                                        <th class="px-4 py-3 font-semibold text-center">Aksi</th>
-                                    </tr>
-                                </thead>
+                                <td class="px-4 py-3">
+                                    {{ strtoupper(str_replace('_inti','',$u->kedudukan)) }}
+                                </td>
 
-                                <tbody class="divide-y divide-gray-200 bg-white">
-                                    @foreach($users as $user)
-                                        <tr class="hover:bg-gray-50">
-                                            <td class="px-4 py-3">
-                                                <div class="font-medium text-gray-900">{{ $user->name }}</div>
-                                                <div class="text-xs text-gray-500">{{ $user->email }}</div>
-                                            </td>
+                                <td class="px-4 py-3">
+                                    {{ $u->jabatan_label }}
+                                </td>
 
-                                            <td class="px-4 py-3 capitalize">
-                                                {{ $user->jabatan_label }}
-                                            </td>
+                                <td class="px-4 py-3">
+                                    <span class="px-3 py-1 text-xs rounded-full
+                                        {{ $u->status==='active'
+                                            ? 'bg-green-50 text-green-700'
+                                            : 'bg-gray-100 text-gray-700' }}">
+                                        {{ ucfirst($u->status) }}
+                                    </span>
+                                </td>
 
-                                            <td class="px-4 py-3">
-                                                @php
-                                                    $color = match($user->status) {
-                                                        'active'    => 'bg-green-50 text-green-700 border-green-200',
-                                                        'pending'   => 'bg-yellow-50 text-yellow-700 border-yellow-200',
-                                                        'rejected'  => 'bg-red-50 text-red-700 border-red-200',
-                                                        'suspended' => 'bg-gray-100 text-gray-700 border-gray-200',
-                                                        default     => 'bg-gray-50 text-gray-700 border-gray-200'
-                                                    };
-                                                @endphp
+                                <td class="px-4 py-3 text-center">
+                                    <a href="{{ route('users.show', $u) }}"
+                                       class="px-3 py-1.5 bg-indigo-600 text-white rounded-md text-xs">
+                                        Info
+                                    </a>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5" class="text-center py-10 text-gray-500">
+                                    Tidak ada data user.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
 
-                                                <span class="inline-flex items-center px-3 py-1 text-xs rounded-full font-semibold border {{ $color }}">
-                                                    {{ ucfirst($user->status) }}
-                                                </span>
-                                            </td>
-
-                                            <td class="px-4 py-3 text-center">
-                                                <a href="{{ route('users.show', $user) }}"
-                                                   class="inline-flex items-center px-3 py-1.5 bg-indigo-600 text-white rounded-md text-xs font-semibold hover:bg-indigo-700">
-                                                    Info
-                                                </a>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="mt-4">
-                            {{ $users->links() }}
-                        </div>
-                    @endif
-
+                <div class="p-4">
+                    {{ $users->links() }}
                 </div>
             </div>
-
         </div>
     </div>
 </x-app-layout>

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Bidang;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -19,26 +21,27 @@ class Template extends Model
         'size',
         'uploaded_by',
         'bidang_id',
+        'share_to_bidang',
     ];
-
-    // protected $casts = [
-    //     'share_to_bidang' => 'boolean',
-    // ];
 
     public function uploader()
     {
         return $this->belongsTo(User::class, 'uploaded_by');
     }
 
-    // Relasi ke Bidang
-    public function bidangs()
-    {
-        return $this->belongsToMany(\App\Models\Bidang::class, 'template_bidang')
-        ->withTimestamps();
-    }
-
     public function bidang()
     {
-        return $this->belongsTo(\App\Models\Bidang::class, 'bidang_id');
+        return $this->belongsTo(Bidang::class, 'bidang_id');
+    }
+
+    // NOTE: relasi pivot ini boleh kamu HAPUS kalau memang sudah tidak dipakai lagi.
+    public function bidangs()
+    {
+        return $this->belongsToMany(
+            Bidang::class,
+            'template_bidang',
+            'template_id',
+            'bidang_id'
+        )->withTimestamps();
     }
 }

@@ -76,7 +76,27 @@ class RolePermissionSeeder extends Seeder
             'ketua_lingkungan',
             'wakil_ketua_lingkungan',
             'anggota_komunitas',
-            'sekretariat', // ✅ TAMBAH INI
+            'sekretariat', 
+            
+            // lingkungan - wilayah
+            'fasilitator_wilayah',
+            'sekretaris_wilayah',
+            'bendahara_wilayah',
+            'sie_biak_wilayah',
+            'sie_omk_wilayah',
+            'sie_keluarga_wilayah',
+            'sie_lansia_wilayah',
+            'sie_tatib_kolektan_wilayah',
+
+            // lingkungan - lingkungan
+            'sekretaris_lingkungan',
+            'bendahara_lingkungan',
+            'seksi_liturgi',
+            'seksi_katekese',
+            'seksi_kerasulan_kitab_suci',
+            'seksi_sosial',
+            'seksi_pengabdian_masyarakat',
+            'pelayanan_kematian',
         ];
 
         foreach ($roles as $name) {

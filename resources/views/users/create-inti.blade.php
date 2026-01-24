@@ -17,7 +17,6 @@
                     <span class="font-semibold text-green-700">Active</span>.
                 </p>
 
-                {{-- GLOBAL ERROR --}}
                 @if ($errors->any())
                     <div class="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
                         <p class="font-semibold mb-2">Gagal menyimpan. Periksa kembali input berikut:</p>
@@ -29,7 +28,6 @@
                     </div>
                 @endif
 
-                {{-- FORM --}}
                 <form action="{{ route('users.store') }}" method="POST" class="space-y-6">
                     @csrf
 
@@ -82,6 +80,52 @@
                         <x-input-error :messages="$errors->get('kedudukan')" class="mt-2" />
                     </div>
 
+                    {{-- KHUSUS LINGKUNGAN: SCOPE --}}
+                    <div id="wrapLingScope" class="hidden">
+                        <x-input-label for="lingkungan_scope" value="Scope" />
+                        <select
+                            id="lingkungan_scope"
+                            name="lingkungan_scope"
+                            class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                        >
+                            <option value="">-- Pilih Scope --</option>
+                            <option value="wilayah" {{ old('lingkungan_scope')==='wilayah' ? 'selected' : '' }}>Wilayah</option>
+                            <option value="lingkungan" {{ old('lingkungan_scope')==='lingkungan' ? 'selected' : '' }}>Lingkungan</option>
+                        </select>
+                        <x-input-error :messages="$errors->get('lingkungan_scope')" class="mt-2" />
+                    </div>
+
+                    {{-- KHUSUS LINGKUNGAN: WILAYAH --}}
+                    <div id="wrapWilayah" class="hidden">
+                        <x-input-label for="wilayah" value="Wilayah" />
+                        <select
+                            id="wilayah"
+                            name="wilayah"
+                            class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                        >
+                            <option value="">-- Pilih Wilayah --</option>
+                            @foreach(array_keys($lingkunganMap ?? []) as $w)
+                                <option value="{{ $w }}" {{ old('wilayah')===$w ? 'selected' : '' }}>
+                                    {{ str_replace('_', ' ', strtoupper($w)) }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <x-input-error :messages="$errors->get('wilayah')" class="mt-2" />
+                    </div>
+
+                    {{-- KHUSUS LINGKUNGAN: LINGKUNGAN (muncul hanya jika scope=lingkungan) --}}
+                    <div id="wrapLingkungan" class="hidden">
+                        <x-input-label for="lingkungan" value="Lingkungan" />
+                        <select
+                            id="lingkungan"
+                            name="lingkungan"
+                            class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                        >
+                            <option value="">-- Pilih Lingkungan --</option>
+                        </select>
+                        <x-input-error :messages="$errors->get('lingkungan')" class="mt-2" />
+                    </div>
+
                     {{-- JABATAN / ROLE --}}
                     <div>
                         <x-input-label for="jabatan" value="Jabatan / Role" />
@@ -101,21 +145,41 @@
                             <option value="bendahara_1" data-kedudukan="dpp_inti,bgkp" {{ old('jabatan')==='bendahara_1'?'selected':'' }}>Bendahara 1</option>
                             <option value="bendahara_2" data-kedudukan="dpp_inti,bgkp" {{ old('jabatan')==='bendahara_2'?'selected':'' }}>Bendahara 2</option>
 
-                            {{-- Ketua Bidang: DPP Inti + BGKP + Lingkungan --}}
-                            <option value="ketua_bidang" data-kedudukan="dpp_inti,bgkp,lingkungan" {{ old('jabatan')==='ketua_bidang'?'selected':'' }}>
-                                Ketua Bidang
-                            </option>
+                            {{-- Ketua Bidang --}}
+                            <option value="ketua_bidang" data-kedudukan="dpp_inti,bgkp" {{ old('jabatan')==='ketua_bidang'?'selected':'' }}>Ketua Bidang</option>
 
                             {{-- Ketua Sie: khusus DPP Inti --}}
                             <option value="ketua_sie" data-kedudukan="dpp_inti" {{ old('jabatan')==='ketua_sie'?'selected':'' }}>Ketua Sie</option>
 
-                            {{-- Lingkungan --}}
-                            <option value="ketua_lingkungan" data-kedudukan="lingkungan" {{ old('jabatan')==='ketua_lingkungan'?'selected':'' }}>Ketua Lingkungan</option>
-                            <option value="wakil_ketua_lingkungan" data-kedudukan="lingkungan" {{ old('jabatan')==='wakil_ketua_lingkungan'?'selected':'' }}>Wakil Ketua Lingkungan</option>
-                            <option value="anggota_komunitas" data-kedudukan="lingkungan" {{ old('jabatan')==='anggota_komunitas'?'selected':'' }}>Anggota Komunitas</option>
-
                             {{-- Sekretariat --}}
                             <option value="sekretariat" data-kedudukan="sekretariat" {{ old('jabatan')==='sekretariat'?'selected':'' }}>Sekretariat</option>
+
+                            {{-- ========================= --}}
+                            {{-- ✅ LINGKUNGAN (BRIEF BARU) --}}
+                            {{-- ========================= --}}
+
+                            {{-- scope: wilayah --}}
+                            <option value="fasilitator_wilayah" data-kedudukan="lingkungan" data-scope="wilayah" {{ old('jabatan')==='fasilitator_wilayah'?'selected':'' }}>Fasilitator Wilayah</option>
+                            <option value="sekretaris_wilayah" data-kedudukan="lingkungan" data-scope="wilayah" {{ old('jabatan')==='sekretaris_wilayah'?'selected':'' }}>Sekretaris Wilayah</option>
+                            <option value="bendahara_wilayah" data-kedudukan="lingkungan" data-scope="wilayah" {{ old('jabatan')==='bendahara_wilayah'?'selected':'' }}>Bendahara Wilayah</option>
+                            <option value="sie_biak_wilayah" data-kedudukan="lingkungan" data-scope="wilayah" {{ old('jabatan')==='sie_biak_wilayah'?'selected':'' }}>Sie BIAK (Wilayah)</option>
+                            <option value="sie_omk_wilayah" data-kedudukan="lingkungan" data-scope="wilayah" {{ old('jabatan')==='sie_omk_wilayah'?'selected':'' }}>Sie OMK (Wilayah)</option>
+                            <option value="sie_keluarga_wilayah" data-kedudukan="lingkungan" data-scope="wilayah" {{ old('jabatan')==='sie_keluarga_wilayah'?'selected':'' }}>Sie Keluarga (Wilayah)</option>
+                            <option value="sie_lansia_wilayah" data-kedudukan="lingkungan" data-scope="wilayah" {{ old('jabatan')==='sie_lansia_wilayah'?'selected':'' }}>Sie Lansia (Wilayah)</option>
+                            <option value="sie_tatib_kolektan_wilayah" data-kedudukan="lingkungan" data-scope="wilayah" {{ old('jabatan')==='sie_tatib_kolektan_wilayah'?'selected':'' }}>Sie Tatib Kolektan (Wilayah)</option>
+
+                            {{-- scope: lingkungan --}}
+                            <option value="ketua_lingkungan" data-kedudukan="lingkungan" data-scope="lingkungan" {{ old('jabatan')==='ketua_lingkungan'?'selected':'' }}>Ketua Lingkungan</option>
+                            <option value="wakil_ketua_lingkungan" data-kedudukan="lingkungan" data-scope="lingkungan" {{ old('jabatan')==='wakil_ketua_lingkungan'?'selected':'' }}>Wakil Ketua Lingkungan</option>
+                            <option value="sekretaris_lingkungan" data-kedudukan="lingkungan" data-scope="lingkungan" {{ old('jabatan')==='sekretaris_lingkungan'?'selected':'' }}>Sekretaris Lingkungan</option>
+                            <option value="bendahara_lingkungan" data-kedudukan="lingkungan" data-scope="lingkungan" {{ old('jabatan')==='bendahara_lingkungan'?'selected':'' }}>Bendahara Lingkungan</option>
+                            <option value="seksi_liturgi" data-kedudukan="lingkungan" data-scope="lingkungan" {{ old('jabatan')==='seksi_liturgi'?'selected':'' }}>Seksi Liturgi</option>
+                            <option value="seksi_katekese" data-kedudukan="lingkungan" data-scope="lingkungan" {{ old('jabatan')==='seksi_katekese'?'selected':'' }}>Seksi Katekese</option>
+                            <option value="seksi_kerasulan_kitab_suci" data-kedudukan="lingkungan" data-scope="lingkungan" {{ old('jabatan')==='seksi_kerasulan_kitab_suci'?'selected':'' }}>Seksi Kerasulan Kitab Suci</option>
+                            <option value="seksi_sosial" data-kedudukan="lingkungan" data-scope="lingkungan" {{ old('jabatan')==='seksi_sosial'?'selected':'' }}>Seksi Sosial</option>
+                            <option value="seksi_pengabdian_masyarakat" data-kedudukan="lingkungan" data-scope="lingkungan" {{ old('jabatan')==='seksi_pengabdian_masyarakat'?'selected':'' }}>Seksi Pengabdian Masyarakat</option>
+                            <option value="pelayanan_kematian" data-kedudukan="lingkungan" data-scope="lingkungan" {{ old('jabatan')==='pelayanan_kematian'?'selected':'' }}>Pelayanan Urusan Kematian</option>
+                            {{-- <option value="anggota_lingkungan" data-kedudukan="lingkungan" data-scope="lingkungan" {{ old('jabatan')==='anggota_lingkungan'?'selected':'' }}>Anggota Lingkungan</option> --}}
                         </select>
 
                         <x-input-error :messages="$errors->get('jabatan')" class="mt-2" />
@@ -211,6 +275,8 @@
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
+        const lingkunganMap = @json($lingkunganMap ?? []);
+
         const kedudukan = document.getElementById('kedudukan');
         const jabatan   = document.getElementById('jabatan');
 
@@ -219,13 +285,33 @@
         const bidang     = document.getElementById('bidang_id');
         const sie        = document.getElementById('sie_id');
 
-        function filterJabatanByKedudukan() {
+        const wrapLingScope = document.getElementById('wrapLingScope');
+        const wrapWilayah   = document.getElementById('wrapWilayah');
+        const wrapLingkungan= document.getElementById('wrapLingkungan');
+
+        const lingScope = document.getElementById('lingkungan_scope');
+        const wilayah   = document.getElementById('wilayah');
+        const lingkungan= document.getElementById('lingkungan');
+
+        function isLingkunganSelected() {
+            return kedudukan.value === 'lingkungan';
+        }
+
+        function filterJabatan() {
             const k = kedudukan.value;
+            const sc = lingScope.value;
 
             [...jabatan.options].forEach(opt => {
                 if (!opt.value) return;
-                const allowed = (opt.dataset.kedudukan || '').split(',').map(s => s.trim());
-                const show = allowed.includes(k);
+
+                const allowedK = (opt.dataset.kedudukan || '').split(',').map(s => s.trim()).filter(Boolean);
+                let show = allowedK.includes(k);
+
+                // khusus lingkungan: wajib match scope
+                if (show && k === 'lingkungan') {
+                    const optScope = opt.dataset.scope || '';
+                    show = optScope ? (optScope === sc) : false;
+                }
 
                 opt.hidden = !show;
                 opt.disabled = !show;
@@ -265,7 +351,6 @@
 
         function toggleBidangSie() {
             const j = jabatan.value;
-
             const needsBidang = (j === 'ketua_bidang' || j === 'ketua_sie');
             const needsSie    = (j === 'ketua_sie');
 
@@ -285,18 +370,85 @@
             }
         }
 
+        function rebuildLingkunganOptions() {
+            const w = wilayah.value;
+            const list = lingkunganMap[w] || [];
+
+            // reset options
+            lingkungan.innerHTML = '<option value="">-- Pilih Lingkungan --</option>';
+
+            list.forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                lingkungan.appendChild(opt);
+            });
+
+            // re-apply old()
+            const oldVal = @json(old('lingkungan'));
+            if (oldVal) {
+                lingkungan.value = oldVal;
+            }
+        }
+
+        function toggleLingkunganFields() {
+            const isLing = isLingkunganSelected();
+
+            wrapLingScope.classList.toggle('hidden', !isLing);
+            wrapWilayah.classList.toggle('hidden', !isLing);
+
+            // lingkungan hanya tampil jika scope=lingkungan
+            const showLingkungan = isLing && (lingScope.value === 'lingkungan');
+            wrapLingkungan.classList.toggle('hidden', !showLingkungan);
+
+            if (!isLing) {
+                lingScope.value = '';
+                wilayah.value = '';
+                lingkungan.innerHTML = '<option value="">-- Pilih Lingkungan --</option>';
+            } else {
+                if (wilayah.value) rebuildLingkunganOptions();
+            }
+
+            // ketika kedudukan=lingkungan, bidang/sie tidak dipakai
+            if (isLing) {
+                wrapBidang.classList.add('hidden');
+                wrapSie.classList.add('hidden');
+                bidang.value = '';
+                sie.value = '';
+            }
+        }
+
         kedudukan.addEventListener('change', () => {
-            filterJabatanByKedudukan();
+            toggleLingkunganFields();
+            filterJabatan();
             toggleBidangSie();
         });
 
-        jabatan.addEventListener('change', toggleBidangSie);
+        lingScope.addEventListener('change', () => {
+            toggleLingkunganFields();
+            filterJabatan();
+            toggleBidangSie();
+        });
+
+        wilayah.addEventListener('change', () => {
+            rebuildLingkunganOptions();
+        });
+
+        jabatan.addEventListener('change', () => {
+            toggleBidangSie();
+        });
+
         bidang.addEventListener('change', filterSieByBidang);
 
-        // initial load (old() case)
-        filterJabatanByKedudukan();
+        // initial
+        toggleLingkunganFields();
+        filterJabatan();
         toggleBidangSie();
+
+        // jika ada old wilayah, rebuild lingkungan
+        if (kedudukan.value === 'lingkungan' && wilayah.value) {
+            rebuildLingkunganOptions();
+        }
     });
     </script>
-
 </x-app-layout>
