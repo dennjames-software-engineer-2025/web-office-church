@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Models\Folder;
 use App\Models\Document;
 use App\Models\Template;
@@ -29,7 +30,24 @@ class SavedFileController extends Controller
 
         $user = Auth::user();
 
-        abort_unless($folder->created_by === $user->id || $user->hasRole('super_admin'), 403);
+        if ($user->hasRole('super_admin')) {
+            // ok
+        } else {
+            $isSek12DppInti = $user->hasRole('sekretaris')
+                && $user->kedudukan === 'dpp_inti'
+                && in_array($user->jabatan, ['sekretaris_1','sekretaris_2'], true);
+
+            if ($isSek12DppInti) {
+                $sekIds = User::role('sekretaris')
+                    ->where('kedudukan', 'dpp_inti')
+                    ->whereIn('jabatan', ['sekretaris_1','sekretaris_2'])
+                    ->pluck('id');
+
+                abort_unless($sekIds->contains((int)$folder->created_by), 403);
+            } else {
+                abort_unless((int)$folder->created_by === (int)$user->id, 403);
+            }
+        }
 
         $data = $request->validate([
             'source' => ['required', 'in:template,proposal_file,document'],

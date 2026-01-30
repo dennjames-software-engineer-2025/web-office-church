@@ -72,7 +72,7 @@
                             required
                         >
                             <option value="">-- Pilih Kedudukan --</option>
-                            <option value="dpp_inti" {{ old('kedudukan')==='dpp_inti' ? 'selected' : '' }}>DPP Inti</option>
+                            <option value="dpp_inti" {{ old('kedudukan')==='dpp_inti' ? 'selected' : '' }}>DPP</option>
                             <option value="bgkp" {{ old('kedudukan')==='bgkp' ? 'selected' : '' }}>BGKP</option>
                             <option value="lingkungan" {{ old('kedudukan')==='lingkungan' ? 'selected' : '' }}>Lingkungan</option>
                             <option value="sekretariat" {{ old('kedudukan')==='sekretariat' ? 'selected' : '' }}>Sekretariat</option>

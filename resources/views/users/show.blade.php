@@ -13,19 +13,6 @@
     <div class="py-6">
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-4">
 
-            {{-- Flash status/error --}}
-            @if (session('status'))
-                <div class="rounded-lg bg-green-50 border border-green-200 text-green-700 px-4 py-3">
-                    {{ session('status') }}
-                </div>
-            @endif
-
-            @if (session('error'))
-                <div class="rounded-lg bg-red-50 border border-red-200 text-red-700 px-4 py-3">
-                    {{ session('error') }}
-                </div>
-            @endif
-
             {{-- ✅ ACTION BUTTONS (di atas card, bukan header) --}}
             <div class="flex items-center justify-end gap-2">
                 <a href="{{ route('users.index') }}"
@@ -67,7 +54,7 @@
                         };
 
                         $kedudukanLabel = match($user->kedudukan) {
-                            'dpp_inti'     => 'DPP Inti',
+                            'dpp_inti'     => 'DPP Harian',
                             'bgkp'         => 'BGKP',
                             'lingkungan'   => 'Lingkungan',
                             'sekretariat'  => 'Sekretariat',

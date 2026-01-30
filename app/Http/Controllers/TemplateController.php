@@ -217,12 +217,13 @@ class TemplateController extends Controller
         $canDelete = $user->hasRole('super_admin') || $user->can('files.manage');
         abort_unless($canDelete, 403, 'Anda tidak memiliki akses untuk menghapus template ini.');
 
-        $disk = Storage::disk('public');
-        if ($disk->exists($template->path)) {
-            $disk->delete($template->path);
-        }
+        // ❌ jangan hapus file fisik saat soft delete
+        // $disk = Storage::disk('public');
+        // if ($disk->exists($template->path)) {
+        //     $disk->delete($template->path);
+        // }
 
-        $template->delete();
+        $template->delete(); // soft delete
 
         return redirect()->route('templates.index')->with('status', 'Template berhasil dihapus');
     }

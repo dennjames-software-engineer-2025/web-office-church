@@ -3,6 +3,7 @@
 use App\Models\Proposal;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\LpjController;
 use App\Http\Controllers\SieController;
 use App\Http\Controllers\ToolsController;
 use App\Http\Controllers\BidangController;
@@ -15,11 +16,11 @@ use App\Http\Controllers\ProposalController;
 use App\Http\Controllers\TemplateController;
 use App\Http\Controllers\SavedFileController;
 use App\Http\Controllers\PengesahanController;
+use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\ProposalFileController;
 use App\Http\Controllers\UserApprovalController;
 use App\Http\Controllers\MeetingMinuteController;
 use App\Http\Controllers\UserManagementController;
-use App\Http\Controllers\AnnouncementController;
 
 // Route::get('/', function () {
 //     return view('welcome');
@@ -410,15 +411,49 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::patch('/proposals/{proposal}/unarchive', [ProposalController::class, 'unarchive'])
             ->name('proposals.unarchive');
+
+
+        /* Route untuk LPJ (Scoped di dalam Proposal) */
+        Route::prefix('/proposals/{proposal}')->group(function () {
+            Route::get('/lpj/create', [LpjController::class, 'create'])->name('lpj.create');
+            Route::post('/lpj', [LpjController::class, 'store'])->name('lpj.store');
+
+            // ✅ list LPJ dalam 1 proposal (untuk DPP Harian / Ketua Bidang dll)
+            Route::get('/lpjs', [LpjController::class, 'listByProposal'])->name('lpj.by_proposal');
+
+            Route::get('/lpj/{lpj}', [LpjController::class, 'show'])->name('lpj.show');
+
+            Route::get('/lpj/{lpj}/files/{lpjFile}/preview', [LpjController::class, 'preview'])
+                ->name('lpj.files.preview');
+            Route::get('/lpj/{lpj}/files/{lpjFile}/download', [LpjController::class, 'download'])
+                ->name('lpj.files.download');
+
+            Route::patch('/lpj/{lpj}/approve-ketua-bidang', [LpjController::class, 'approveKetuaBidang'])
+                ->name('lpj.approve_ketua_bidang');
+            Route::patch('/lpj/{lpj}/approve-final', [LpjController::class, 'approveFinal'])
+                ->name('lpj.approve_final');
+            Route::patch('/lpj/{lpj}/reject-final', [LpjController::class, 'rejectFinal'])
+                ->name('lpj.reject_final');
+            Route::patch('/lpj/{lpj}/notes', [LpjController::class, 'addNotes'])
+                ->name('lpj.add_notes');
+
+            Route::delete('/lpj/{lpj}', [LpjController::class, 'destroy'])->name('lpj.destroy');
+        });
     });
+    /**
+         * OPTIONAL (global lpjs)
+         * Kalau kamu tetap mau halaman global /lpjs, biarkan.
+         * Kalau kamu fokus “LPJ harus di dalam proposal”, boleh hapus route ini.
+         */
+        Route::get('/lpjs', [LpjController::class, 'index'])->name('lpjs.index');
 
     // ======================================================================
     // END PENGAJUAN PROPOSAL
     // ======================================================================
 
-    // ===============================
+    // ======================================================================
     // FILE MANAGEMENT 
-    // ===============================
+    // ======================================================================
 
     /* Sekretaris */
     Route::middleware(['auth', 'verified', 'permission:files.manage'])->group(function () {

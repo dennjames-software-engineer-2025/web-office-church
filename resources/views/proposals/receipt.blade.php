@@ -66,11 +66,9 @@
 
         <div class="note">
             <b>Perhatian:</b>
-            Bukti Penerimaan harus diunduh dan di-print guna dikumpulkan ke Bendahara,
-            sebagai tanda bahwa Proposal telah disetujui.
             <ol class="muted">
-                <li>Dokumen ini merupakan bukti bahwa proposal sudah disetujui.</li>
-                <li>Serahkan hasil print ke Bendahara untuk proses administrasi.</li>
+                <li>Dokumen ini merupakan persetujuan Romo Paroki dan tidak diperlukan tanda tangan. Silahkan melanjutkan prosedur ke Sistem Informasi Gereja Keuskupan Surabaya.</li>
+                <li>Proposal fisik mohon disampaikan ke Romo Paroki untuk ditandatangan dan menjadi arsip Gereja paling lambat sebelum tanggal kegiatan dilaksanakan.</li>
             </ol>
         </div>
     </div>

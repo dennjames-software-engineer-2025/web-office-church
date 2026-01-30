@@ -12,19 +12,6 @@
 
     <div class="py-6">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-4">
-
-            {{-- FLASH --}}
-            @if (session('status'))
-                <div class="rounded-lg bg-green-100 text-green-800 px-4 py-3 shadow">
-                    {{ session('status') }}
-                </div>
-            @endif
-            @if (session('error'))
-                <div class="rounded-lg bg-red-100 text-red-800 px-4 py-3 shadow">
-                    {{ session('error') }}
-                </div>
-            @endif
-
             {{-- TOP BAR --}}
             <div class="bg-white shadow sm:rounded-lg p-4">
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">

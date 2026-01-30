@@ -86,7 +86,7 @@
                         </div>
 
                         {{-- DESKRIPSI --}}
-                        <div>
+                        {{-- <div>
                             <label for="description" class="block text-sm font-medium text-gray-700">
                                 Deskripsi (opsional)
                             </label>
@@ -101,10 +101,10 @@
                             <p class="mt-2 text-xs text-gray-500">
                                 Deskripsi membantu pengurus memahami isi tanpa harus membuka file.
                             </p>
-                        </div>
+                        </div> --}}
 
                         {{-- SHARE BIDANG (KHUSUS INTI) --}}
-                        @if($isInti)
+                        {{-- @if($isInti)
                             <div class="rounded-lg border bg-gray-50 p-4">
                                 <div class="flex items-start gap-3">
                                     <div class="text-lg">📢</div>
@@ -129,7 +129,7 @@
                                     @endforeach
                                 </div>
                             </div>
-                        @endif
+                        @endif --}}
 
                         {{-- ACTIONS --}}
                         <div class="flex flex-col sm:flex-row gap-3 sm:justify-end">

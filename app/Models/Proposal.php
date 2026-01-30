@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\Lpj;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Proposal extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'created_by',
@@ -44,6 +46,9 @@ class Proposal extends Model
         'ketua_bidang_approved_at'  => 'datetime',
         'romo_approved_at'          => 'datetime',
         'rejected_at'               => 'datetime',
+        'bidang_id'                 => 'integer',
+        'sie_id'                    => 'integer',
+        'created_by'                => 'integer',
     ];
 
     public function pengaju()
@@ -64,5 +69,15 @@ class Proposal extends Model
     public function files()
     {
         return $this->hasMany(ProposalFile::class);
+    }
+
+    public function lpjs()
+    {
+        return $this->hasMany(Lpj::class);
+    }
+
+    public function latestLpj()
+    {
+        return $this->hasOne(Lpj::class)->latestOfMany();
     }
 }

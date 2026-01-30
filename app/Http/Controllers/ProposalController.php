@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Models\Folder;
 use App\Models\Proposal;
 use Illuminate\Support\Str;
@@ -21,29 +22,22 @@ class ProposalController extends Controller
         if (! $user) return false;
         if (! $user->hasRole('sekretaris')) return false;
 
+        $key = strtolower(trim($user->jabatan_key_active ?? $user->jabatan_key ?? ''));
+        if (in_array($key, ['sekretaris_1', 'sekretaris_2'], true)) return true;
+
         $jabatan = strtolower(trim($user->jabatan ?? ''));
         $jabatan = str_replace([' ', '-'], '_', $jabatan);
 
-        return in_array($jabatan, ['sekretaris_1', 'sekretaris_2'], true);
+        return str_starts_with($jabatan, 'sekretaris_1') || str_starts_with($jabatan, 'sekretaris_2');
     }
 
     public function index()
     {
         $user = Auth::user();
 
-        $folders = Auth::user()->can('files.manage')
-            ? Folder::where('created_by', Auth::id())->orderBy('name')->get()
+        $folders = $user->can('files.manage')
+            ? Folder::where('created_by', $user->id)->orderBy('name')->get()
             : collect();
-
-        // Auto promote DPP Harian -> Romo ketika deadline lewat
-        Proposal::query()
-            ->where('stage', 'dpp_harian')
-            ->whereNotNull('dpp_harian_until')
-            ->where('dpp_harian_until', '<=', now())
-            ->update([
-                'stage'  => 'romo',
-                'status' => 'menunggu_romo',
-            ]);
 
         $query = Proposal::query()
             ->with([
@@ -51,59 +45,66 @@ class ProposalController extends Controller
                 'bidang:id,nama_bidang',
                 'sie:id,nama_sie',
                 'files:id,proposal_id,original_name,file_path,mime_type,file_size',
+                'latestLpj',
             ])
             ->latest();
 
+        // 1) Super admin: semua
         if ($user->hasRole('super_admin')) {
             $proposals = $query->paginate(10);
-            return view('proposals.index', compact('proposals', 'folders'));
+            return view('proposals.control', compact('proposals', 'folders'));
         }
 
+        // 2) Bendahara: hanya approved
         if ($user->hasRole('bendahara')) {
-            $query->where('status', 'approved');
+            $query->whereIn('status', ['approved', 'menunggu_romo']);
             $proposals = $query->paginate(10);
-            return view('proposals.index', compact('proposals', 'folders'));
+            return view('proposals.control', compact('proposals', 'folders'));
         }
 
+        // 3) Ketua Bidang:
+        // - lihat semua proposal bidangnya (tracking realtime)
+        // - + lihat semua proposal approved lintas bidang
         if ($user->hasRole('ketua_bidang')) {
             $query->where(function ($q) use ($user) {
-                $q->where(function ($qq) use ($user) {
-                    $qq->where('stage', 'ketua_bidang')
-                        ->where('bidang_id', $user->bidang_id);
-                });
-
-                $q->orWhereIn('stage', ['dpp_harian', 'romo', 'bendahara'])
-                    ->orWhere('status', 'approved');
+                $q->where('bidang_id', $user->bidang_id)          // semua status, asal bidangnya sama
+                ->orWhere('status', 'approved');               // approved lintas bidang
             });
 
             $proposals = $query->paginate(10);
-            return view('proposals.index', compact('proposals', 'folders'));
+            return view('proposals.control', compact('proposals', 'folders'));
         }
 
+        // 4) DPP Inti (Ketua/Wakil/Sekretaris 1-2):
         if ($user->hasAnyRole(['ketua', 'wakil_ketua', 'sekretaris'])) {
 
+            // kalau sekretaris tapi bukan 1/2, kosongkan
             if ($user->hasRole('sekretaris') && ! $this->isSekretaris1or2($user)) {
                 $query->whereRaw('1=0');
                 $proposals = $query->paginate(10);
-                return view('proposals.index', compact('proposals', 'folders'));
+                return view('proposals.control', compact('proposals', 'folders'));
             }
 
+            // tampilkan: menunggu_romo, revisi, approved
             $query->where(function ($q) {
-                $q->where('stage', 'dpp_harian')
-                    ->orWhere('stage', 'romo')
-                    ->orWhere('status', 'approved');
+                $q->where('status', 'menunggu_romo')
+                ->orWhere('status', 'revisi')
+                ->orWhere('status', 'approved');
+
+                // kalau kamu masih pakai stage dpp_harian, boleh tambahkan:
+                // ->orWhere('stage', 'dpp_harian');
             });
 
             $proposals = $query->paginate(10);
-            return view('proposals.index', compact('proposals', 'folders'));
+            return view('proposals.control', compact('proposals', 'folders'));
         }
 
-        // default pengaju lihat miliknya
-        $query->where('created_by', $user->id);
-        $query->whereNull('archived_at');
+        // 5) Default: Ketua Sie/pengaju -> hanya proposal miliknya, yang belum di-archive
+        $query->where('created_by', $user->id)
+            ->whereNull('archived_at');
 
         $proposals = $query->paginate(10);
-        return view('proposals.index', compact('proposals', 'folders'));
+        return view('proposals.control', compact('proposals', 'folders'));
     }
 
     public function create()
@@ -139,6 +140,7 @@ class ProposalController extends Controller
             'tujuan'     => $validated['tujuan'],
             'status'     => 'menunggu_ketua_bidang',
             'stage'      => 'ketua_bidang',
+            'proposal_no'   => $this->generateProposalNo(),
         ]);
 
         foreach ($request->file('files') as $file) {
@@ -171,18 +173,18 @@ class ProposalController extends Controller
         $this->authorize('approveKetuaBidang', $proposal);
 
         if ($proposal->status !== 'menunggu_ketua_bidang' || $proposal->stage !== 'ketua_bidang') {
-            return back()->with('error', 'Proposal tidak berada di tahap Ketua Bidang.');
+            return back()->with('error', 'Proposal tidak berada di tahap Ketua Bidang');
         }
 
         $proposal->update([
             'ketua_bidang_approved_by' => Auth::id(),
             'ketua_bidang_approved_at' => now(),
-            'status' => 'dpp_harian',
-            'stage'  => 'dpp_harian',
-            'dpp_harian_until' => now()->addDays(3),
+            'stage'                    => 'romo',
+            'status'                   => 'menunggu_romo', 
+            'dpp_harian_until'         => null,
         ]);
 
-        return back()->with('status', 'Proposal di-approve Ketua Bidang dan masuk DPP Harian (default 3 hari).');
+        return redirect()->route('proposals.index')->with('status', 'Proposal di-approve Ketua Bidang dan masuk ke tahap Persetujuan DPP');
     }
 
     public function setDppDeadline(Request $request, Proposal $proposal)
@@ -206,19 +208,7 @@ class ProposalController extends Controller
 
     public function endDppHarian(Proposal $proposal)
     {
-        $this->authorize('endDppHarian', $proposal);
-
-        if ($proposal->stage !== 'dpp_harian') {
-            return back()->with('error', 'Proposal tidak berada di tahap DPP Harian.');
-        }
-
-        $proposal->update([
-            'dpp_harian_until' => now(),
-            'stage'  => 'romo',
-            'status' => 'menunggu_romo',
-        ]);
-
-        return back()->with('status', 'Proposal dikirim ke tahap Romo (DPP Harian diselesaikan lebih cepat).');
+        abort(404); // fitur dimatikan sesuai brief terbaru
     }
 
     /**
@@ -241,7 +231,7 @@ class ProposalController extends Controller
         $stamp = now()->format('Y-m-d H:i');
         $actor = $user->name . ' (' . ($user->jabatan ?? $user->getRoleNames()->implode(', ')) . ')';
 
-        $newEntry = "[{$stamp}] {$actor}:\n" . trim($validated['notes']);
+        $newEntry = trim($validated['notes']);
 
         $proposal->update([
             'notes' => $proposal->notes
@@ -257,17 +247,18 @@ class ProposalController extends Controller
         $this->authorize('approveRomo', $proposal);
 
         if ($proposal->stage !== 'romo' || $proposal->status !== 'menunggu_romo') {
-            return back()->with('error', 'Proposal belum berada di tahap Romo.');
+            return back()->with('error', 'Proposal belum berada di tahap final (menunggu DPP).');
         }
 
-        $proposalNo = 'PRP-' . now()->format('Ymd') . '-' . strtoupper(Str::random(6));
+        if (empty($proposal->proposal_no)) {
+            $proposal->proposal_no = $this->generateProposalNo();
+        }
 
         $proposal->update([
             'romo_approved_by' => Auth::id(),
             'romo_approved_at' => now(),
             'status'      => 'approved',
             'stage'       => 'bendahara',
-            'proposal_no' => $proposalNo,
             'reject_reason'  => null,
             'rejected_by'    => null,
             'rejected_at'    => null,
@@ -297,20 +288,19 @@ class ProposalController extends Controller
         ]);
 
         if ($proposal->stage !== 'romo' || $proposal->status !== 'menunggu_romo') {
-            return back()->with('error', 'Proposal belum berada di tahap Romo.');
+            return back()->with('error', 'Proposal belum berada di tahap final (Menunggu DPP');
         }
 
         $proposal->update([
-            'status' => 'revisi',   // ✅ ganti dari ditolak -> revisi
-            'stage'  => 'sie',
-
-            'reject_reason'  => $validated['reject_reason'],
-            'rejected_by'    => Auth::id(),
-            'rejected_at'    => now(),
-            'rejected_stage' => 'romo',
+            'status'    => 'revisi',
+            'stage'     => 'sie',
+            'reject_reason' => $validated['reject_reason'],
+            'rejected_by'   => Auth::id(),
+            'rejected_at'   => now(),
+            'rejected_stage'    => 'romo',
         ]);
 
-        return back()->with('status', 'Proposal dikembalikan untuk Revisi (kembali ke pengaju / Sie).');
+        return redirect()->route('proposals.index')->with('status', 'Proposal dikembalikan untuk Revisi');
     }
 
     public function destroy(Proposal $proposal)
@@ -319,25 +309,32 @@ class ProposalController extends Controller
 
         $proposal->load('files');
 
+        // ❌ jangan delete file fisik
+        // foreach ($proposal->files as $f) {
+        //     if ($f->file_path) {
+        //         Storage::disk('public')->delete($f->file_path);
+        //     }
+        //     $f->delete();
+        // }
+
+        // ✅ cukup soft delete file records (opsional, tapi biasanya benar)
         foreach ($proposal->files as $f) {
-            if ($f->file_path) {
-                Storage::disk('public')->delete($f->file_path);
-            }
-            $f->delete();
+            $f->delete(); // soft delete
         }
 
-        if ($proposal->receipt_path) {
-            Storage::disk('public')->delete($proposal->receipt_path);
-        }
+        // ❌ receipt juga jangan dihapus kalau arsip
+        // if ($proposal->receipt_path) {
+        //     Storage::disk('public')->delete($proposal->receipt_path);
+        // }
 
-        $proposal->delete();
+        $proposal->delete(); // soft delete
 
         return redirect()->route('proposals.index')->with('status', 'Proposal berhasil dihapus.');
     }
 
     public function receiptPreview(Proposal $proposal)
     {
-        $this->authorize('view', $proposal);
+        $this->authorize('viewReceipt', $proposal);
 
         if (!$proposal->receipt_path) {
             return back()->with('error', 'Bukti penerimaan belum tersedia.');
@@ -354,7 +351,7 @@ class ProposalController extends Controller
 
     public function receiptDownload(Proposal $proposal)
     {
-        $this->authorize('view', $proposal);
+        $this->authorize('downloadReceipt', $proposal);
 
         if (!$proposal->receipt_path) {
             return back()->with('error', 'Bukti penerimaan belum tersedia.');
@@ -416,4 +413,15 @@ class ProposalController extends Controller
         // pastikan proposalnya ada
         abort_unless($file->proposal_id, 404);
     }
+
+    // Generate Nomor Proposal
+    private function generateProposalNo(): string
+    {
+        do {
+            $no = 'PRP-' . now()->format('Ymd') . '-' . strtoupper(Str::random(6));
+        } while (Proposal::where('proposal_no', $no)->exists());
+
+        return $no;
+    }
+    // End
 }

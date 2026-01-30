@@ -139,26 +139,15 @@ class DocumentController extends Controller
 
     public function destroy(Document $document): RedirectResponse
     {
-        $user = Auth::user();
-        $isInti = $user->hasAnyRole(['super_admin','ketua','wakil_ketua','sekretaris','bendahara']);
-        $isNonInti = $user->hasAnyRole(['ketua_bidang','ketua_sie','anggota_komunitas','ketua_lingkungan','wakil_ketua_lingkungan']);
+        $this->authorize('delete', $document);
 
-        if ($user->hasRole('super_admin')) {
-            // allowed
-        } elseif ($isInti) {
-            abort_unless(is_null($document->bidang_id) && $document->user_id === $user->id, 403);
-        } elseif ($isNonInti) {
-            abort_unless($document->bidang_id === $user->bidang_id && $document->user_id === $user->id, 403);
-        } else {
-            abort(403);
-        }
+        // ❌ JANGAN hapus file fisik kalau konsepnya arsip aman
+        // $disk = Storage::disk('public');
+        // if ($disk->exists($document->path)) {
+        //     $disk->delete($document->path);
+        // }
 
-        $disk = Storage::disk('public');
-        if ($disk->exists($document->path)) {
-            $disk->delete($document->path);
-        }
-
-        $document->delete();
+        $document->delete(); // soft delete
 
         return redirect()->route('documents.index')->with('status', 'Dokumen berhasil dihapus');
     }

@@ -143,7 +143,7 @@ class RegisteredUserController extends Controller
 
     event(new Registered($user));
 
-    Mail::to($user->email)->send(new UserRegisteredPendingMail($user));
+    // Mail::to($user->email)->send(new UserRegisteredPendingMail($user));
 
     // (Email notifikasi register akan kita tambahkan setelah ini)
     return redirect()

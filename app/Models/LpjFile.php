@@ -2,25 +2,29 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
-class ProposalFile extends Model
+class LpjFile extends Model
 {
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'proposal_id',
+        'lpj_id',
         'original_name',
         'file_path',
         'mime_type',
         'file_size',
     ];
 
-    /* File hanya milik satu proposal (Spesifikasi dari file) */
-    public function proposal()
+    protected $casts = [
+        'lpj_id' => 'integer',
+        'file_size' => 'integer',
+    ];
+
+    public function lpj()
     {
-        return $this->belongsTo(Proposal::class);
+        return $this->belongsTo(Lpj::class);
     }
 }

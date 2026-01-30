@@ -7,10 +7,20 @@
     <!-- Session Status -->
     <x-auth-session-status class="mb-4" :status="session('status')" />
 
+    @php
+        $kedudukan = session('login_kedudukan');
+
+        $kedudukanLabel = match ($kedudukan) {
+            'dpp_harian' => 'DPP Harian',
+            'dpp_inti'   => 'DPP Harian', // kalau masih ada data lama, tetap tampil benar
+            default      => strtoupper(str_replace('_', ' ', $kedudukan ?? '')),
+        };
+    @endphp
+
     @if (session('login_kedudukan'))
         <div class="mb-4 p-3 rounded bg-gray-100 text-gray-700 text-sm flex items-center justify-between">
             <div>
-                Login sebagai kedudukan: <span class="font-semibold">{{ strtoupper(str_replace('_', ' ', session('login_kedudukan'))) }}</span>
+                Login sebagai kedudukan: <span class="font-semibold">{{ $kedudukanLabel }}</span>
             </div>
             <a href="{{ route('welcome.kedudukan') }}" class="underline text-sm">
                 Ganti kedudukan

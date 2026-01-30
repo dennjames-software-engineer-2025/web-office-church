@@ -137,11 +137,11 @@
                                                     </a>
 
                                                     {{-- ✅ Hapus --}}
-                                                    @if(auth()->id() === $doc->user_id || auth()->user()->hasRole('super_admin'))
+                                                    @can('delete', $doc)
                                                         <form id="delete-form-{{ $doc->id }}"
-                                                              method="POST"
-                                                              action="{{ route('documents.destroy', $doc) }}"
-                                                              class="hidden">
+                                                            method="POST"
+                                                            action="{{ route('documents.destroy', $doc) }}"
+                                                            class="hidden">
                                                             @csrf
                                                             @method('DELETE')
                                                         </form>
@@ -151,7 +151,7 @@
                                                                 class="px-3 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm">
                                                             Hapus
                                                         </button>
-                                                    @endif
+                                                    @endcan
 
                                                     {{-- ✅ Folder (tetap) --}}
                                                     @can('files.manage')

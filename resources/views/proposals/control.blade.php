@@ -1,10 +1,12 @@
-{{-- resources/views/proposals/index.blade.php --}}
+{{-- resources/views/proposals/control.blade.php --}}
+@php use Illuminate\Support\Facades\Gate; @endphp
+
 <x-app-layout>
     <x-slot name="header">
         <div class="flex flex-col gap-1">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">Pengajuan Proposal</h2>
             <p class="text-sm text-gray-500">
-                Ajukan, review, dan proses persetujuan proposal sesuai alur (Sie → Ketua Bidang → DPP Harian → Romo → Bendahara).
+                Ajukan, review, dan proses persetujuan proposal sesuai alur (Sie → Ketua Bidang → DPP (Ketua DPP & Sekretaris 1-2)).
             </p>
         </div>
     </x-slot>
@@ -62,11 +64,10 @@
                                 <thead>
                                     <tr class="bg-gray-50 text-gray-700 text-xs uppercase tracking-wide">
                                         <th class="px-4 py-3">Proposal</th>
+                                        <th class="px-4 py-3">No. Proposal</th>
                                         <th class="px-4 py-3">Bidang / Sie</th>
-                                        <th class="px-4 py-3">Pengaju</th>
                                         <th class="px-4 py-3">Status</th>
                                         <th class="px-4 py-3">Tahap</th>
-                                        <th class="px-4 py-3">Tanggal</th>
                                         <th class="px-4 py-3 text-center">Aksi</th>
                                     </tr>
                                 </thead>
@@ -78,29 +79,28 @@
                                             $sieName = $p->sie?->nama_sie ?? '-';
                                             $pengajuName = $p->pengaju?->name ?? '-';
 
+                                            // ✅ STATUS (brief baru)
                                             $statusLabel = match($p->status) {
                                                 'menunggu_ketua_bidang' => 'Menunggu Ketua Bidang',
-                                                'dpp_harian'            => 'DPP Harian (View-only)',
-                                                'menunggu_romo'         => 'Menunggu Romo',
+                                                'menunggu_romo'         => 'Menunggu Persetujuan DPP',
                                                 'approved'              => 'Disetujui',
-                                                'ditolak'               => 'Ditolak',
+                                                'revisi'                => 'Revisi',
                                                 default                 => ucfirst(str_replace('_',' ', $p->status ?? '-')),
                                             };
 
+                                            // ✅ STAGE (brief baru)
                                             $stageLabel = match($p->stage) {
                                                 'sie'         => 'Sie (Pengaju)',
                                                 'ketua_bidang' => 'Ketua Bidang',
-                                                'dpp_harian'   => 'DPP Harian',
-                                                'romo'         => 'Romo',
+                                                'romo'         => 'DPP (Ketua / Sekretaris 1-2)',
                                                 'bendahara'    => 'Bendahara',
                                                 default        => ucfirst(str_replace('_',' ', $p->stage ?? '-')),
                                             };
 
                                             $statusClass = match($p->status) {
                                                 'approved'              => 'bg-green-50 text-green-700',
-                                                'ditolak'               => 'bg-red-50 text-red-700',
+                                                'revisi'                => 'bg-red-50 text-red-700',
                                                 'menunggu_romo'         => 'bg-yellow-50 text-yellow-800',
-                                                'dpp_harian'            => 'bg-blue-50 text-blue-700',
                                                 'menunggu_ketua_bidang' => 'bg-gray-100 text-gray-700',
                                                 default                 => 'bg-gray-100 text-gray-700',
                                             };
@@ -108,7 +108,6 @@
                                             $stageClass = match($p->stage) {
                                                 'bendahara'   => 'bg-green-50 text-green-700',
                                                 'romo'        => 'bg-yellow-50 text-yellow-800',
-                                                'dpp_harian'  => 'bg-blue-50 text-blue-700',
                                                 'ketua_bidang'=> 'bg-indigo-50 text-indigo-700',
                                                 'sie'         => 'bg-gray-100 text-gray-700',
                                                 default       => 'bg-gray-100 text-gray-700',
@@ -124,103 +123,124 @@
                                                 ($p->proposal_no ?? '')
                                             );
 
-                                            // files untuk Preview/Download (dipakai JS Swal)
                                             $filesArr = collect($p->files ?? [])->map(fn($f) => [
                                                 'id' => $f->id,
                                                 'name' => $f->original_name,
                                             ])->values()->all();
                                         @endphp
 
+                                        {{-- Kolom Proposal --}}
                                         <tr class="hover:bg-gray-50 proposal-row" data-search="{{ $searchHaystack }}">
+
+                                            {{-- Nama Proposal --}}
                                             <td class="px-4 py-3">
                                                 <div class="font-semibold text-gray-900">{{ $p->judul }}</div>
                                                 <div class="text-xs text-gray-500 mt-1">
-                                                    Lampiran: {{ $p->files?->count() ?? 0 }} file
-                                                    @if(!empty($p->proposal_no))
-                                                        • No: <span class="font-semibold text-gray-700">{{ $p->proposal_no }}</span>
-                                                    @endif
-                                                </div>
-                                                <div class="text-xs text-gray-600 mt-1">
                                                     {{ \Illuminate\Support\Str::limit($p->tujuan ?? '-', 80) }}
                                                 </div>
+                                                {{-- <div class="text-xs text-gray-600 mt-1">
+                                                    Lampiran: {{ $p->files?->count() ?? 0 }} file
+                                                </div> --}}
                                             </td>
+                                            {{-- End Nama Proposal --}}
 
+                                            {{-- Nomor Proposal --}}
                                             <td class="px-4 py-3">
-                                                <div class="text-sm text-gray-900">{{ $bidangName }}</div>
-                                                <div class="text-xs text-gray-500 mt-1">{{ $sieName }}</div>
+                                                @if(!empty($p->proposal_no))
+                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800 font-semibold">
+                                                        {{ $p->proposal_no }}
+                                                    </span>
+                                                @else
+                                                    <span class="text-sm text-gray-500">
+                                                        -
+                                                    </span>
+                                                @endif
                                             </td>
+                                            {{-- End Nomor Proposal --}}
 
+                                            {{-- Sie & Bidang Pengaju --}}
                                             <td class="px-4 py-3">
-                                                <div class="text-sm text-gray-900">{{ $pengajuName }}</div>
-                                                <div class="text-xs text-gray-500 mt-1">{{ $p->pengaju?->email ?? '-' }}</div>
+                                                <div class="text-sm text-gray-900">{{ $sieName }}</div>
+                                                <div class="text-xs text-gray-500 mt-1">{{ $bidangName }}</div>
                                             </td>
+                                            {{-- End Sie & Bidang Pengaju --}}
 
+                                            {{-- Status --}}
                                             <td class="px-4 py-3">
                                                 <span class="inline-flex items-center px-2 py-1 rounded-full text-xs {{ $statusClass }}">
                                                     {{ $statusLabel }}
                                                 </span>
-
-                                                @if($p->status === 'dpp_harian' && $p->dpp_harian_until)
-                                                    <div class="text-xs text-gray-500 mt-2">
-                                                        Sampai: {{ $p->dpp_harian_until->format('d-m-Y | H:i') }}
-                                                    </div>
-                                                @endif
                                             </td>
+                                            {{-- End Status --}}
 
+                                            {{-- Tahap --}}
                                             <td class="px-4 py-3">
                                                 <span class="inline-flex items-center px-2 py-1 rounded-full text-xs {{ $stageClass }}">
                                                     {{ $stageLabel }}
                                                 </span>
                                             </td>
+                                            {{-- End Tahap --}}
 
-                                            <td class="px-4 py-3">
-                                                <div class="text-sm text-gray-900">{{ optional($p->created_at)->format('d-m-Y') }}</div>
-                                                <div class="text-xs text-gray-500">{{ optional($p->created_at)->format('H:i') }}</div>
-                                            </td>
-
+                                            {{-- Aksi --}}
                                             <td class="px-4 py-3">
                                                 <div class="flex items-center justify-center gap-2 flex-wrap">
-                                                    {{-- LEFT (Detail + Hapus) --}}
+
+                                                    @php
+                                                        $u = auth()->user();
+                                                        $canSubmitLpj = $u && $u->hasRole('ketua_sie') && (int)$p->created_by === (int)$u->id && $p->status === 'approved';
+                                                    @endphp
+
                                                     <a href="{{ route('proposals.show', $p) }}"
                                                        class="px-3 py-2 rounded-lg bg-gray-800 text-white hover:bg-gray-900 text-sm">
                                                         Detail
                                                     </a>
 
-                                                    @can('delete', $p)
-                                                        <form method="POST"
-                                                              action="{{ route('proposals.destroy', $p) }}"
-                                                              class="proposal-delete-form"
-                                                              data-title="{{ $p->judul }}">
-                                                            @csrf
-                                                            @method('DELETE')
-                                                            <button type="submit"
-                                                                    class="px-3 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm">
-                                                                Hapus
-                                                            </button>
-                                                        </form>
-                                                    @endcan
+                                                    @php
+                                                        $u = auth()->user();
 
-                                                    {{-- RIGHT (Preview, Download, +Folder) — urutan kanan ke kiri --}}
+                                                        // cek apakah proposal ini punya LPJ
+                                                        // (pakai relation yang sudah kamu eager load latestLpj sebagai indikator cepat)
+                                                        $hasAnyLpj = !is_null($p->latestLpj);
+
+                                                        // aturan tampil tombol "Lihat LPJ":
+                                                        // - kalau ada LPJ minimal 1
+                                                        // - dan user role reviewer (ketua bidang / dpp / bendahara / superadmin) atau pemilik proposal
+                                                        $canOpenLpjList = $hasAnyLpj && $u && (
+                                                            $u->hasRole('super_admin')
+                                                            || $u->hasRole('ketua_bidang')
+                                                            || $u->hasRole('bendahara')
+                                                            || $u->hasAnyRole(['ketua','wakil_ketua','sekretaris'])
+                                                            || ((int)$p->created_by === (int)$u->id) // pemilik proposal
+                                                        );
+                                                    @endphp
+
+                                                    @if($canOpenLpjList)
+                                                        <a href="{{ route('lpj.by_proposal', $p) }}"
+                                                        class="p-2 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                                        title="Lihat semua LPJ">
+                                                            {{-- icon dokumen/list --}}
+                                                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                                <path d="M8 6h13M8 12h13M8 18h13"/>
+                                                                <path d="M3 6h.01M3 12h.01M3 18h.01"/>
+                                                            </svg>
+                                                        </a>
+                                                    @endif
+
+                                                    @if($canSubmitLpj)
+                                                    <a href="{{ route('lpj.create', $p) }}"
+                                                        class="p-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100"
+                                                        title="Submit LPJ">
+                                                        {{-- icon upload --}}
+                                                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                                            <path d="M7 10l5-5 5 5"/>
+                                                            <path d="M12 5v14"/>
+                                                        </svg>
+                                                    </a>
+                                                    @endif
+
+                                                    {{-- Fitur Manajemen File khusus Sekretaris --}}
                                                     <div class="flex flex-row-reverse items-center gap-2 flex-wrap">
-                                                        {{-- PREVIEW --}}
-                                                        <button type="button"
-                                                                class="px-3 py-2 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 text-sm"
-                                                                data-proposal-id="{{ $p->id }}"
-                                                                data-files='@json($filesArr)'
-                                                                onclick="openProposalFileAction(this, 'preview')">
-                                                            Preview
-                                                        </button>
-
-                                                        {{-- DOWNLOAD --}}
-                                                        <button type="button"
-                                                                class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm"
-                                                                data-proposal-id="{{ $p->id }}"
-                                                                data-files='@json($filesArr)'
-                                                                onclick="openProposalFileAction(this, 'download')">
-                                                            Download
-                                                        </button>
-
-                                                        {{-- + FOLDER --}}
                                                         @can('files.manage')
                                                             @if(($folders ?? collect())->isEmpty())
                                                                 <a href="{{ route('folders.index') }}"
@@ -239,11 +259,8 @@
                                                                     <div class="absolute right-0 mt-2 w-72 bg-white border rounded-lg shadow-lg p-3 z-20">
                                                                         <form method="POST" onsubmit="return submitToFolderProposal(this);">
                                                                             @csrf
-
-                                                                            {{-- WAJIB: source harus proposal_file --}}
                                                                             <input type="hidden" name="source" value="proposal_file">
 
-                                                                            {{-- source_id: kalau 1 file -> hidden, kalau banyak -> select --}}
                                                                             @if(($p->files?->count() ?? 0) === 1)
                                                                                 <input type="hidden" name="source_id" value="{{ $p->files->first()->id }}">
                                                                             @else
@@ -274,9 +291,11 @@
                                                             @endif
                                                         @endcan
                                                     </div>
-                                                    {{-- END RIGHT --}}
+                                                    {{-- End fitur Manajemen File --}}
+
                                                 </div>
                                             </td>
+                                            {{-- End Aksi --}}
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -303,9 +322,6 @@
 
     @once
         <script>
-            // =========================
-            // Live Search
-            // =========================
             const proposalSearch = document.getElementById('proposalSearch');
             const proposalRows = document.querySelectorAll('.proposal-row');
             const proposalNoResult = document.getElementById('proposalNoResult');
@@ -326,9 +342,6 @@
                 });
             }
 
-            // =========================
-            // Flash
-            // =========================
             @if (session('status'))
                 Swal.fire({ icon: 'success', title: 'Berhasil', text: @json(session('status')) });
             @endif
@@ -336,88 +349,11 @@
                 Swal.fire({ icon: 'error', title: 'Terjadi Kesalahan', text: @json(session('error')) });
             @endif
 
-            // =========================
-            // Delete confirm
-            // =========================
-            document.querySelectorAll('.proposal-delete-form').forEach(form => {
-                form.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    const title = form.getAttribute('data-title') || 'proposal ini';
-
-                    const res = await Swal.fire({
-                        icon: 'warning',
-                        title: 'Hapus Proposal?',
-                        text: `Yakin ingin menghapus "${title}"? Semua lampiran & bukti penerimaan ikut terhapus.`,
-                        showCancelButton: true,
-                        confirmButtonText: 'Ya, hapus',
-                        cancelButtonText: 'Batal'
-                    });
-
-                    if (res.isConfirmed) form.submit();
-                });
-            });
-
-            // =========================
-            // Preview / Download ProposalFile (1 file = langsung, multi = pilih via Swal)
-            // =========================
-            const baseProposalsUrl = @json(url('/proposals'));
-
-            async function openProposalFileAction(btn, action) {
-                const proposalId = btn.getAttribute('data-proposal-id');
-                let files = [];
-
-                try { files = JSON.parse(btn.getAttribute('data-files') || '[]'); }
-                catch(e) { files = []; }
-
-                if (!proposalId || !files.length) {
-                    Swal.fire({ icon: 'info', title: 'Tidak ada lampiran', text: 'Proposal ini tidak memiliki file.' });
-                    return;
-                }
-
-                // 1 file -> langsung
-                if (files.length === 1) {
-                    const fileId = files[0].id;
-                    const url = `${baseProposalsUrl}/${proposalId}/files/${fileId}/${action === 'download' ? 'download' : 'preview'}`;
-                    window.open(url, '_blank');
-                    return;
-                }
-
-                // multi -> pilih
-                const options = {};
-                files.forEach(f => { options[String(f.id)] = f.name; });
-
-                const res = await Swal.fire({
-                    title: action === 'download' ? 'Pilih file untuk Download' : 'Pilih file untuk Preview',
-                    input: 'select',
-                    inputOptions: options,
-                    inputPlaceholder: 'Pilih file...',
-                    showCancelButton: true,
-                    confirmButtonText: action === 'download' ? 'Download' : 'Preview',
-                    cancelButtonText: 'Batal',
-                    inputValidator: (value) => {
-                        if (!value) return 'Pilih file dulu.';
-                    }
-                });
-
-                if (!res.isConfirmed) return;
-
-                const fileId = res.value;
-                const url = `${baseProposalsUrl}/${proposalId}/files/${fileId}/${action === 'download' ? 'download' : 'preview'}`;
-                window.open(url, '_blank');
-            }
-
-            window.openProposalFileAction = openProposalFileAction;
-
-            // =========================
-            // + Folder (Proposal)
-            // =========================
             function submitToFolderProposal(form) {
                 const folderId = form.querySelector('[name="folder_id"]').value;
-
                 const sourceIdEl = form.querySelector('[name="source_id"]');
                 const sourceId = sourceIdEl ? sourceIdEl.value : '';
 
-                // kalau ada select source_id tapi kosong => user belum pilih file
                 if (sourceIdEl && !sourceId) {
                     Swal.fire('Pilih file proposal dulu', '', 'warning');
                     return false;
@@ -428,10 +364,10 @@
                     return false;
                 }
 
+
                 form.action = `/folders/${folderId}/items`;
                 return true;
             }
-
             window.submitToFolderProposal = submitToFolderProposal;
         </script>
     @endonce

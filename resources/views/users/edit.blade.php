@@ -88,7 +88,7 @@
                             required
                         >
                             <option value="">-- Pilih Kedudukan --</option>
-                            <option value="dpp_inti" {{ old('kedudukan', $user->kedudukan)==='dpp_inti' ? 'selected' : '' }}>DPP Inti</option>
+                            <option value="dpp_inti" {{ old('kedudukan', $user->kedudukan)==='dpp_inti' ? 'selected' : '' }}>DPP Harian</option>
                             <option value="bgkp" {{ old('kedudukan', $user->kedudukan)==='bgkp' ? 'selected' : '' }}>BGKP</option>
                             <option value="lingkungan" {{ old('kedudukan', $user->kedudukan)==='lingkungan' ? 'selected' : '' }}>Lingkungan</option>
                             <option value="sekretariat" {{ old('kedudukan', $user->kedudukan)==='sekretariat' ? 'selected' : '' }}>Sekretariat</option>

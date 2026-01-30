@@ -176,6 +176,9 @@ class RolePermissionSeeder extends Seeder
             'documents.create',
             'documents.delete',
             'announcements.view',
+            'announcements.create',
+            'announcements.update',
+            'announcements.delete'
         ]);
 
         Role::findByName('ketua_sie', 'web')->syncPermissions([
@@ -191,6 +194,9 @@ class RolePermissionSeeder extends Seeder
             'documents.create',
             'documents.delete',
             'announcements.view',
+            'announcements.create',
+            'announcements.update',
+            'announcements.delete'
         ]);
 
         Role::findByName('ketua_lingkungan', 'web')->syncPermissions([

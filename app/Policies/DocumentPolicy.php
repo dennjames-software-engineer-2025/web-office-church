@@ -4,7 +4,6 @@ namespace App\Policies;
 
 use App\Models\Document;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class DocumentPolicy
 {
@@ -56,18 +55,22 @@ class DocumentPolicy
      */
     public function delete(User $user, Document $document): bool
     {
+        // wajib punya permission delete
         if (! $user->can('documents.delete')) return false;
 
+        // super admin selalu boleh
         if ($user->hasRole('super_admin')) return true;
 
-        // yang upload boleh hapus (baik inti maupun bidang)
-        if ((int)$document->user_id === (int)$user->id) return true;
+        // hanya SEKRETARIS 1/2 di kedudukan DPP INTI yang boleh
+        if (! $user->hasRole('sekretaris')) return false;
 
-        // tim inti boleh hapus dokumen inti (optional, boleh kamu aktifkan)
-        $isInti = $user->hasAnyRole(['ketua','wakil_ketua','sekretaris','bendahara']);
-        if ($isInti && is_null($document->bidang_id)) return true;
+        $kedudukan = strtolower(trim((string) ($user->kedudukan ?? '')));
+        if ($kedudukan !== 'dpp_inti') return false;
 
-        return false;
+        $jabatan = strtolower(trim((string) ($user->jabatan ?? '')));
+        $jabatan = str_replace([' ', '-'], '_', $jabatan);
+
+        return in_array($jabatan, ['sekretaris_1', 'sekretaris_2'], true);
     }
 
     /**

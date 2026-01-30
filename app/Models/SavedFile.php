@@ -31,9 +31,13 @@ class SavedFile extends Model
         return $this->belongsTo(Folder::class);
     }
 
+    /**
+     * ✅ penting: ikutkan data yang soft deleted
+     */
+    // SavedFile.php
     public function source()
     {
-        return $this->morphTo(null, 'source_type', 'source_id');
+        return $this->morphTo(null, 'source_type', 'source_id')->withTrashed();
     }
 
     public function addedBy()

@@ -15,10 +15,19 @@ class ProposalPolicy
         if (! $user) return false;
         if (! $user->hasRole('sekretaris')) return false;
 
+        // Paling aman: gunakan jabatan_key_active / jabatan_key (kalau tersedia)
+        $key = strtolower(trim($user->jabatan_key_active ?? $user->jabatan_key ?? ''));
+
+        if (in_array($key, ['sekretaris_1', 'sekretaris_2'], true)) {
+            return true;
+        }
+
+        // Fallback: normalize dari jabatan string biasa
         $jabatan = strtolower(trim($user->jabatan ?? ''));
         $jabatan = str_replace([' ', '-'], '_', $jabatan);
 
-        return in_array($jabatan, ['sekretaris_1', 'sekretaris_2'], true);
+        // Supaya "sekretaris_2_dpp_harian" tetap lolos
+        return str_starts_with($jabatan, 'sekretaris_1') || str_starts_with($jabatan, 'sekretaris_2');
     }
 
     /**
@@ -26,7 +35,10 @@ class ProposalPolicy
      */
     private function isRomo(User $user): bool
     {
-        return $user->hasRole('ketua') && $user->kedudukan === 'dpp_inti';
+        $ked = strtolower(trim((string) $user->kedudukan));
+        $ked = str_replace([' ', '-'], '_', $ked);
+
+        return $user->hasRole('ketua') && in_array($ked, ['dpp_inti', 'dpp_harian'], true);
     }
 
     /**
@@ -51,22 +63,24 @@ class ProposalPolicy
         if ($proposal->created_by === $user->id) return true;
 
         // ketua bidang: lintas bidang setelah dpp_harian
+        /* Ketua Bidang hanya bisa lihat Proposal bidangnya */
         if ($user->hasRole('ketua_bidang')) {
-            if (in_array($proposal->stage, ['dpp_harian', 'romo', 'bendahara'], true) || $proposal->status === 'approved') {
-                return true;
-            }
-            return $user->bidang_id && $proposal->bidang_id === $user->bidang_id;
+            // Supaya semua Ketua Bidang bisa melihat semua Proposal yang sudah Approved
+            if ($proposal->status === 'approved') return true;
+
+            // supaya Ketua Bidang bisa men-tracking Proposal | Berlaku  untuk semua Status
+            return $user->bidang_id !== null && (int)$proposal->bidang_id === (int)$user->bidang_id;
         }
 
         // DPP inti boleh lihat setelah masuk DPP Harian ke atas
-        if ($this->isDppIntiMember($user)) {
+        if ($this->isDppIntiMember($user) || $this->isRomo($user)) {
             return in_array($proposal->stage, ['dpp_harian', 'romo', 'bendahara'], true)
-                || in_array($proposal->status, ['menunggu_romo','approved'], true);
+                || in_array($proposal->status, ['menunggu_romo', 'revisi', 'approved'], true);
         }
 
         // bendahara hanya setelah approved
         if ($user->hasRole('bendahara')) {
-            return $proposal->status === 'approved' || $proposal->stage === 'bendahara';
+            return in_array($proposal->status, ['menunggu_romo', 'approved'], true);
         }
 
         return false;
@@ -96,7 +110,7 @@ class ProposalPolicy
      */
     public function addNotes(User $user, Proposal $proposal): bool
     {
-        if ($user->hasRole('super_admin')) return true;
+        if ($user->hasRole(['super_admin', 'ketua'])) return true;
 
         $isSek12 = $this->isSekretaris12($user);
         $stageOk  = in_array($proposal->stage, ['dpp_harian', 'romo'], true);
@@ -107,16 +121,18 @@ class ProposalPolicy
 
     public function approveRomo(User $user, Proposal $proposal): bool
     {
-        if ($user->hasRole('super_admin')) return true;
+        if (! $this->canFinalApproveOrReject($user)) return false;
 
-        return $this->isRomo($user)
-            && $proposal->stage === 'romo'
-            && $proposal->status === 'menunggu_romo';
+        // wajib sesuai brief: hanya saat menunggu romo
+        return $proposal->stage === 'romo' && $proposal->status === 'menunggu_romo';
     }
 
     public function rejectRomo(User $user, Proposal $proposal): bool
     {
-        return $this->approveRomo($user, $proposal);
+        if (! $this->canFinalApproveOrReject($user)) return false;
+
+        // wajib sesuai brief: hanya saat menunggu romo
+        return $proposal->stage === 'romo' && $proposal->status === 'menunggu_romo';
     }
 
     /**
@@ -145,8 +161,43 @@ class ProposalPolicy
 
     public function downloadFile(User $user, Proposal $proposal): bool
     {
+        if ($user->hasRole('super_admin')) return true;
+
+        if ($user->hasRole('bendahara')) {
+            return $proposal->status === 'approved';
+        }
+
         return $this->view($user, $proposal);
     }
+
+    // Lihat BPP
+    public function viewReceipt(User $user, Proposal $proposal): bool
+    {
+        if ($user->hasRole('super_admin')) return true;
+
+        // BPP ada ketika Proposal di Approved
+        if ($proposal->status !== 'approved') return false;
+        if (empty($proposal->receipt_path)) return false;
+
+        // Ketua Sie Pengaju
+        if ((int)$proposal->created_by === (int)$user->id) return true;
+
+        // Ketua Bidang yang Approve proposal (tidak lintas Bidang)
+        if ($user->hasRole('ketua_bidang')) {
+            return (int)$proposal->bidang_id === (int)$user->bidang_id
+            && (int)$proposal->ketua_bidang_approved_by === (int)$user->id;
+        }
+
+        return false;
+    }
+    // End Lihat BPP
+
+    // Unduh BPP
+    public function downloadReceipt(User $user, Proposal $proposal): bool 
+    {
+        return $this->viewReceipt($user, $proposal);
+    }
+    // End Unduh BPP
 
     public function endDppHarian(User $user, Proposal $proposal): bool
     {
@@ -155,5 +206,15 @@ class ProposalPolicy
         $allowed = $this->isSekretaris12($user) || $this->isRomo($user);
 
         return $allowed && $proposal->stage === 'dpp_harian' && $proposal->status === 'dpp_harian';
+    }
+
+    /**
+     * Aktor final = Ketua DPP (Romo) ATAU Sekretaris 1/2
+     */
+    private function canFinalApproveOrReject(User $user): bool
+    {
+        if ($user->hasRole('super_admin')) return true;
+
+        return $this->isRomo($user) || $this->isSekretaris12($user);
     }
 }

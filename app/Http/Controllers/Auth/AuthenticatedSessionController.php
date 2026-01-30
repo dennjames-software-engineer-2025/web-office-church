@@ -51,7 +51,7 @@ class AuthenticatedSessionController extends Controller
             Auth::logout();
 
             $message = match ($user->status) {
-                'pending'   => 'Akun anda masih menungu approval dari Tim Inti',
+                'pending'   => 'Akun anda masih menunggu Approval dari Super Admin',
                 'rejected'  => 'Registrasi anda telah ditolak. Silahkan hubungi Pengurus',
                 'suspended' => 'Akun anda telah dinonaktifkan, Silahkan hubungi Pengurus',
                 default     => 'Akun anda belum dapat digunakan',

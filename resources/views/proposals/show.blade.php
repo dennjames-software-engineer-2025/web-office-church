@@ -1,3 +1,4 @@
+{{-- resources/views/proposals/show.blade.php --}}
 <x-app-layout>
     <x-slot name="header">
         <div class="flex flex-col gap-1">
@@ -10,22 +11,21 @@
         <div class="max-w-5xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white shadow sm:rounded-lg overflow-hidden">
 
-                {{-- Header Card --}}
                 @php
+                    // ✅ STATUS
                     $statusLabel = match($proposal->status) {
                         'menunggu_ketua_bidang' => 'Menunggu Ketua Bidang',
-                        'dpp_harian'            => 'DPP Harian (View-only)',
-                        'menunggu_romo'         => 'Menunggu Romo',
+                        'menunggu_romo'         => 'Menunggu Persetujuan DPP',
                         'approved'              => 'Disetujui',
                         'revisi'                => 'Revisi',
                         default                 => ucfirst(str_replace('_',' ', $proposal->status ?? '-')),
                     };
 
+                    // ✅ STAGE
                     $stageLabel = match($proposal->stage) {
                         'sie'         => 'Sie (Pengaju)',
                         'ketua_bidang' => 'Ketua Bidang',
-                        'dpp_harian'   => 'DPP Harian',
-                        'romo'         => 'Romo',
+                        'romo'         => 'DPP (Ketua / Sekretaris 1-2)',
                         'bendahara'    => 'Bendahara',
                         default        => ucfirst(str_replace('_',' ', $proposal->stage ?? '-')),
                     };
@@ -34,21 +34,14 @@
                         'approved'              => 'bg-green-50 text-green-700 border-green-200',
                         'revisi'                => 'bg-red-50 text-red-700 border-red-200',
                         'menunggu_romo'         => 'bg-yellow-50 text-yellow-800 border-yellow-200',
-                        'dpp_harian'            => 'bg-blue-50 text-blue-700 border-blue-200',
                         'menunggu_ketua_bidang' => 'bg-gray-50 text-gray-700 border-gray-200',
                         default                 => 'bg-gray-50 text-gray-700 border-gray-200',
                     };
 
-                    $stageClass = match($proposal->stage) {
-                        'bendahara'   => 'bg-green-50 text-green-700 border-green-200',
-                        'romo'        => 'bg-yellow-50 text-yellow-800 border-yellow-200',
-                        'dpp_harian'  => 'bg-blue-50 text-blue-700 border-blue-200',
-                        'ketua_bidang'=> 'bg-indigo-50 text-indigo-700 border-indigo-200',
-                        'sie'         => 'bg-gray-50 text-gray-700 border-gray-200',
-                        default       => 'bg-gray-50 text-gray-700 border-gray-200',
-                    };
+                    $isBendahara = auth()->check() && auth()->user()->hasRole('bendahara');
                 @endphp
 
+                {{-- HEADER CARD (Tanggal + Status saja) --}}
                 <div class="p-6 border-b bg-gray-50">
                     <div class="flex items-start justify-between gap-4 flex-wrap">
                         <div class="flex items-center gap-2">
@@ -62,9 +55,6 @@
                             <span class="inline-flex items-center px-3 py-1 rounded-full text-xs border {{ $statusClass }}">
                                 {{ $statusLabel }}
                             </span>
-                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs border {{ $stageClass }}">
-                                Tahap: {{ $stageLabel }}
-                            </span>
                         </div>
                     </div>
 
@@ -72,28 +62,32 @@
                         <div class="text-sm text-gray-500">Judul</div>
                         <div class="text-2xl font-semibold text-gray-900">{{ $proposal->judul }}</div>
 
-                        <div class="text-xs text-gray-500 mt-2 flex flex-wrap gap-2">
-                            <span>Dibuat: {{ optional($proposal->created_at)->format('d-m-Y | H:i') }}</span>
-                            @if(!empty($proposal->proposal_no))
-                                <span>• No Proposal: <span class="font-semibold text-gray-700">{{ $proposal->proposal_no }}</span></span>
-                            @endif
+                        {{-- Tanggal tetap di bawah judul --}}
+                        <div class="text-xs text-gray-500 mt-2">
+                            Dibuat: {{ optional($proposal->created_at)->format('d-m-Y | H:i') }}
                         </div>
-
-                        @if($proposal->status === 'dpp_harian' && $proposal->dpp_harian_until)
-                            <div class="mt-4 rounded-lg bg-blue-50 border border-blue-100 px-4 py-3 inline-block">
-                                <div class="text-xs text-blue-700 font-semibold">DPP Harian sampai</div>
-                                <div class="text-sm text-blue-900 font-medium mt-1">
-                                    {{ $proposal->dpp_harian_until->format('d-m-Y | H:i') }}
-                                </div>
-                            </div>
-                        @endif
                     </div>
                 </div>
 
-                {{-- Body --}}
                 <div class="p-6 space-y-6">
 
+                    {{-- KUMPULAN KOTAK INFO (Termasuk Tahap + No Proposal) --}}
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+
+                        <div class="rounded-lg border bg-white p-4">
+                            <div class="text-gray-500">Nomor Proposal</div>
+                            <div class="text-gray-900 font-semibold mt-1">
+                                {{ $proposal->proposal_no ?? '-' }}
+                            </div>
+                        </div>
+
+                        <div class="rounded-lg border bg-white p-4">
+                            <div class="text-gray-500">Tahap</div>
+                            <div class="text-gray-900 font-semibold mt-1">
+                                {{ $stageLabel }}
+                            </div>
+                        </div>
+
                         <div class="rounded-lg border bg-white p-4">
                             <div class="text-gray-500">Bidang</div>
                             <div class="text-gray-900 font-semibold mt-1">{{ $proposal->bidang?->nama_bidang ?? '-' }}</div>
@@ -104,20 +98,21 @@
                             <div class="text-gray-900 font-semibold mt-1">{{ $proposal->sie?->nama_sie ?? '-' }}</div>
                         </div>
 
-                        <div class="rounded-lg border bg-white p-4">
+                        <div class="rounded-lg border bg-white p-4 sm:col-span-2">
                             <div class="text-gray-500">Pengaju</div>
                             <div class="text-gray-900 font-semibold mt-1">{{ $proposal->pengaju?->name ?? '-' }}</div>
                             <div class="text-xs text-gray-500 mt-1">{{ $proposal->pengaju?->email ?? '-' }}</div>
                         </div>
 
-                        <div class="rounded-lg border bg-white p-4">
+                        <div class="rounded-lg border bg-white p-4 sm:col-span-2">
                             <div class="text-gray-500">Lampiran</div>
                             <div class="text-gray-900 font-semibold mt-1">{{ $proposal->files?->count() ?? 0 }} file</div>
                         </div>
                     </div>
 
+                    {{-- TUJUAN/KETERANGAN (disamakan feel-nya seperti kotak di atas) --}}
                     <div class="rounded-lg border bg-white p-4">
-                        <div class="text-sm text-gray-500">Tujuan / Keterangan</div>
+                        <div class="text-gray-500">Tujuan / Keterangan</div>
                         <div class="mt-2 text-gray-900 whitespace-pre-line leading-relaxed">
                             {{ $proposal->tujuan }}
                         </div>
@@ -137,7 +132,7 @@
                         </div>
                     @endif
 
-                    {{-- Lampiran --}}
+                    {{-- LAMPIRAN (hapus kolom tipe, ganti No) --}}
                     <div class="rounded-lg border bg-white p-4 space-y-3">
                         <div class="text-sm font-semibold text-gray-900">Lampiran Proposal</div>
 
@@ -148,23 +143,36 @@
                                 <table class="min-w-full text-left border-collapse">
                                     <thead>
                                         <tr class="bg-gray-50 text-gray-700 text-xs uppercase tracking-wide">
+                                            <th class="px-4 py-3 w-14">No</th>
                                             <th class="px-4 py-3">Nama File</th>
-                                            <th class="px-4 py-3">Tipe</th>
-                                            <th class="px-4 py-3">Ukuran</th>
-                                            <th class="px-4 py-3 text-center">Aksi</th>
+                                            <th class="px-4 py-3 w-28">Ukuran</th>
+                                            <th class="px-4 py-3 text-center w-56">Aksi</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y">
-                                        @foreach($proposal->files as $f)
+                                        @foreach($proposal->files as $idx => $f)
                                             <tr class="hover:bg-gray-50">
+                                                {{-- No --}}
+                                                <td class="px-4 py-3 text-sm text-gray-700 font-semibold">
+                                                    {{ $idx + 1 }}
+                                                </td>
+                                                {{-- no --}}
+
+                                                {{-- Nama File --}}
                                                 <td class="px-4 py-3">
                                                     <div class="text-sm text-gray-900 font-medium">{{ $f->original_name }}</div>
+                                                    {{-- <div class="text-xs text-gray-500 mt-1">{{ $f->mime_type ?? '-' }}</div> --}}
                                                 </td>
-                                                <td class="px-4 py-3 text-sm text-gray-700">{{ $f->mime_type ?? 'application/pdf' }}</td>
+                                                {{-- End Nama File --}}
+
+                                                {{-- Ukuran --}}
                                                 <td class="px-4 py-3 text-sm text-gray-700">
                                                     @php $kb = $f->file_size ? number_format($f->file_size / 1024, 2) : null; @endphp
                                                     {{ $kb ? $kb.' KB' : '-' }}
                                                 </td>
+                                                {{-- End Ukuran --}}
+
+                                                {{-- Aksi --}}
                                                 <td class="px-4 py-3">
                                                     <div class="flex items-center justify-center gap-2 flex-wrap">
                                                         <a href="{{ route('proposals.files.preview', [$proposal, $f]) }}" target="_blank"
@@ -172,12 +180,16 @@
                                                             Preview
                                                         </a>
 
-                                                        <a href="{{ route('proposals.files.download', [$proposal, $f]) }}"
-                                                           class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">
-                                                            Download
-                                                        </a>
+                                                        @can('downloadFile', $proposal)
+                                                            <a href="{{ route('proposals.files.download', [$proposal, $f]) }}"
+                                                               class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">
+                                                                Download
+                                                            </a>
+                                                        @endcan
                                                     </div>
                                                 </td>
+                                                {{-- End Aksi --}}
+
                                             </tr>
                                         @endforeach
                                     </tbody>
@@ -186,93 +198,115 @@
                         @endif
                     </div>
 
-                    {{-- Receipt --}}
-                    @if($proposal->status === 'approved')
-                        <div class="rounded-lg bg-green-50 border border-green-200 p-4">
-                            <div class="text-sm font-semibold text-green-800">Bukti Penerimaan Proposal</div>
-                            <div class="text-sm text-gray-700 mt-1">
-                                Bukti penerimaan dapat diunduh/preview untuk kemudian di-print dan diserahkan ke Bendahara.
-                            </div>
-
-                            <div class="mt-3 flex gap-2 flex-wrap">
-                                <a href="{{ route('proposals.receipt.preview', $proposal) }}" target="_blank"
-                                   class="px-3 py-2 rounded-lg bg-gray-800 text-white hover:bg-gray-900 text-sm">
-                                    Preview Bukti
-                                </a>
-                                <a href="{{ route('proposals.receipt.download', $proposal) }}"
-                                   class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">
-                                    Download Bukti
-                                </a>
+                    {{-- Catatan khusus Bendahara --}}
+                    @if($isBendahara && $proposal->status === 'menunggu_romo' && !Gate::allows('downloadFile', $proposal))
+                        <div class="mt-3 rounded-lg bg-yellow-50 border border-yellow-200 p-3 text-sm text-yellow-900">
+                            <div class="font-semibold">Catatan</div>
+                            <div class="mt-1">
+                                File hanya bisa diunduh ketika sudah disetujui oleh Ketua DPP / Sekretaris DPP.
                             </div>
                         </div>
                     @endif
 
-                    {{-- Aksi --}}
-                    <div class="rounded-lg border bg-white p-4 space-y-3">
-                        <div class="text-sm font-semibold text-gray-900">Aksi</div>
+                    {{-- RECEIPT --}}
+                    @can('viewReceipt', $proposal)
+                        @if($proposal->status === 'approved')
+                            <div class="rounded-lg bg-green-50 border border-green-200 p-4">
+                                <div class="text-sm font-semibold text-green-800">Bukti Penerimaan Proposal</div>
+                                <div class="text-sm text-gray-700 mt-1">
+                                    Bukti penerimaan dapat diunduh/preview untuk kemudian di-print dan diserahkan ke Bendahara.
+                                </div>
 
+                                <div class="mt-3 flex gap-2 flex-wrap">
+                                    <a href="{{ route('proposals.receipt.preview', $proposal) }}" target="_blank"
+                                    class="px-3 py-2 rounded-lg bg-gray-800 text-white hover:bg-gray-900 text-sm">
+                                        Preview Bukti
+                                    </a>
+
+                                    @can('downloadReceipt', $proposal)
+                                        <a href="{{ route('proposals.receipt.download', $proposal) }}"
+                                        class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">
+                                            Download Bukti
+                                        </a>
+                                    @endcan
+                                </div>
+                            </div>
+                        @endif
+                    @endcan
+
+                    {{-- AKSI (tanpa teks Tahap saat ini) --}}
+                    <div class="rounded-lg border bg-white p-4 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div class="text-sm font-semibold text-gray-900">Aksi</div>
+                        </div>
+
+                        {{-- 1) Ketua Bidang --}}
                         @can('approveKetuaBidang', $proposal)
-                            @if($proposal->status === 'menunggu_ketua_bidang' && $proposal->stage === 'ketua_bidang')
-                                <form method="POST" action="{{ route('proposals.approve_ketua_bidang', $proposal) }}">
-                                    @csrf
-                                    @method('PATCH')
-                                    <button type="submit"
-                                            class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-medium">
-                                        Approve (Ketua Bidang)
-                                    </button>
-                                </form>
-                            @endif
-                        @endcan
-
-                        @can('setDppDeadline', $proposal)
-                            @if($proposal->stage === 'dpp_harian')
-                                <div class="rounded-lg border bg-gray-50 p-4">
-                                    <div class="text-sm font-semibold text-gray-900">Atur Durasi DPP Harian</div>
-                                    <div class="text-xs text-gray-500 mt-1">
-                                        Default 3 hari. Durasi ini menentukan kapan proposal berpindah ke tahap Romo.
-                                    </div>
-
-                                    <form method="POST" action="{{ route('proposals.set_dpp_deadline', $proposal) }}"
-                                          class="mt-3 flex flex-col sm:flex-row gap-2 sm:items-end">
+                            @if($proposal->stage === 'ketua_bidang' && $proposal->status === 'menunggu_ketua_bidang')
+                                <div class="flex flex-wrap gap-2">
+                                    <form method="POST" action="{{ route('proposals.approve_ketua_bidang', $proposal) }}">
                                         @csrf
                                         @method('PATCH')
-
-                                        <div class="w-full sm:w-56">
-                                            <label class="text-xs text-gray-600">Jumlah hari</label>
-                                            <input type="number" name="dpp_days" min="1" max="30" value="3"
-                                                   class="mt-1 w-full rounded-lg border-gray-300 focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
-                                        </div>
-
                                         <button type="submit"
-                                                class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium">
-                                            Simpan Durasi
+                                                class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-medium">
+                                            Setujui
                                         </button>
                                     </form>
                                 </div>
                             @endif
                         @endcan
 
-                        @can('endDppHarian', $proposal)
-                            @if($proposal->stage === 'dpp_harian' && $proposal->status === 'dpp_harian')
-                                <form method="POST" action="{{ route('proposals.end_dpp_harian', $proposal) }}"
-                                      class="end-dpp-form">
-                                    @csrf
-                                    @method('PATCH')
+                        {{-- 2) DPP Final --}}
+                        @if($proposal->stage === 'romo' && $proposal->status === 'menunggu_romo')
+                            <div class="rounded-lg border bg-gray-50 p-4 space-y-3">
+                                <div class="text-sm font-semibold text-gray-900">Persetujuan Romo</div>
 
-                                    <button type="submit"
-                                            class="inline-flex items-center px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 text-sm font-medium">
-                                        Kirim ke Romo Sekarang
-                                    </button>
+                                <div class="flex flex-wrap gap-2">
+                                    @can('approveRomo', $proposal)
+                                        <form method="POST" action="{{ route('proposals.approve_romo', $proposal) }}">
+                                            @csrf
+                                            @method('PATCH')
+                                            <button type="submit"
+                                                    class="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 text-sm font-medium">
+                                                Setujui
+                                            </button>
+                                        </form>
+                                    @endcan
 
-                                    <div class="text-xs text-gray-500 mt-2">
-                                        Tombol ini mempercepat proses tanpa menunggu durasi DPP Harian habis.
-                                    </div>
-                                </form>
-                            @endif
-                        @endcan
+                                    @can('rejectRomo', $proposal)
+                                        <details class="w-full sm:w-auto">
+                                            <summary class="list-none cursor-pointer px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm font-medium inline-flex items-center gap-2">
+                                                Perbaiki
+                                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M6 9l6 6 6-6"/>
+                                                </svg>
+                                            </summary>
 
+                                            <div class="mt-2 rounded-lg border bg-white p-4">
+                                                <form method="POST" action="{{ route('proposals.reject_romo', $proposal) }}" class="space-y-2">
+                                                    @csrf
+                                                    @method('PATCH')
+
+                                                    <label class="text-xs text-gray-600">Catatan Revisi</label>
+                                                    <textarea name="reject_reason" rows="4"
+                                                            class="w-full rounded-lg border-gray-300 focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+                                                            placeholder="Tulis catatan revisi yang jelas..." required>{{ old('reject_reason') }}</textarea>
+
+                                                    <button type="submit"
+                                                            class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm font-medium">
+                                                        Kirim Revisi
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </details>
+                                    @endcan
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- 3) Notes (Sekretaris 1/2) --}}
                         @can('addNotes', $proposal)
-                            @if(in_array($proposal->stage, ['dpp_harian','romo'], true))
+                            @if($proposal->stage === 'romo')
                                 <div class="rounded-lg border bg-gray-50 p-4">
                                     <div class="text-sm font-semibold text-gray-900">Tambahkan Notes</div>
 
@@ -281,8 +315,8 @@
                                         @method('PATCH')
 
                                         <textarea name="notes" rows="4"
-                                                  class="w-full rounded-lg border-gray-300 focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
-                                                  placeholder="Tulis notes yang jelas...">{{ old('notes') }}</textarea>
+                                                class="w-full rounded-lg border-gray-300 focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+                                                placeholder="Tulis notes yang jelas...">{{ old('notes') }}</textarea>
 
                                         <button type="submit"
                                                 class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium">
@@ -293,13 +327,11 @@
                             @endif
                         @endcan
 
-                        {{-- ✅ Tombol Hapus akan muncul untuk:
-                             - Romo / Sekretaris 1/2 kapan saja
-                             - Ketua Sie jika status = revisi --}}
+                        {{-- 4) Delete --}}
                         @can('delete', $proposal)
                             <form method="POST" action="{{ route('proposals.destroy', $proposal) }}"
-                                  class="proposal-delete-form"
-                                  data-title="{{ $proposal->judul }}">
+                                class="proposal-delete-form"
+                                data-title="{{ $proposal->judul }}">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit"
@@ -307,47 +339,6 @@
                                     Hapus Proposal
                                 </button>
                             </form>
-                        @endcan
-
-                        @can('approveRomo', $proposal)
-                            @if($proposal->status === 'menunggu_romo' && $proposal->stage === 'romo')
-                                <div class="flex gap-2 flex-wrap">
-                                    <form method="POST" action="{{ route('proposals.approve_romo', $proposal) }}">
-                                        @csrf
-                                        @method('PATCH')
-                                        <button type="submit"
-                                                class="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 text-sm font-medium">
-                                            Approve (Romo)
-                                        </button>
-                                    </form>
-
-                                    <details class="w-full sm:w-auto">
-                                        <summary class="list-none cursor-pointer px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm font-medium inline-flex items-center gap-2">
-                                            Revisi (Romo)
-                                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <path d="M6 9l6 6 6-6"/>
-                                            </svg>
-                                        </summary>
-
-                                        <div class="mt-2 rounded-lg border bg-white p-4">
-                                            <form method="POST" action="{{ route('proposals.reject_romo', $proposal) }}" class="space-y-2">
-                                                @csrf
-                                                @method('PATCH')
-
-                                                <label class="text-xs text-gray-600">Catatan Revisi</label>
-                                                <textarea name="reject_reason" rows="4"
-                                                          class="w-full rounded-lg border-gray-300 focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
-                                                          placeholder="Tulis catatan revisi yang jelas..." required>{{ old('reject_reason') }}</textarea>
-
-                                                <button type="submit"
-                                                        class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm font-medium">
-                                                    Kirim Revisi
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </details>
-                                </div>
-                            @endif
                         @endcan
                     </div>
 
@@ -378,22 +369,6 @@
                     text: `Yakin ingin menghapus "${title}"? Semua lampiran & bukti penerimaan ikut terhapus.`,
                     showCancelButton: true,
                     confirmButtonText: 'Ya, hapus',
-                    cancelButtonText: 'Batal'
-                });
-
-                if (res.isConfirmed) form.submit();
-            });
-        });
-
-        document.querySelectorAll('.end-dpp-form').forEach(form => {
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const res = await Swal.fire({
-                    icon: 'question',
-                    title: 'Kirim ke Romo sekarang?',
-                    text: 'Ini akan mengakhiri masa DPP Harian dan memindahkan proposal ke tahap Romo.',
-                    showCancelButton: true,
-                    confirmButtonText: 'Ya, kirim',
                     cancelButtonText: 'Batal'
                 });
 
